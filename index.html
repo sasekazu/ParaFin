@@ -165,8 +165,19 @@
             <div class="preview-header">
                 <h2>Geometry Preview</h2>
             </div>
-            <div class="preview-container" id="previewContainer">
-                <svg id="geometrySvg"></svg>
+            <div class="preview-views">
+                <div class="view-container main-view">
+                    <h3 class="view-title">Cross Section (Full View)</h3>
+                    <div class="svg-container" id="mainViewContainer">
+                        <svg id="mainSvg"></svg>
+                    </div>
+                </div>
+                <div class="view-container detail-view">
+                    <h3 class="view-title">Fingerprint Detail (Magnified)</h3>
+                    <div class="svg-container" id="detailViewContainer">
+                        <svg id="detailSvg"></svg>
+                    </div>
+                </div>
             </div>
             <div class="legend" id="legend"></div>
         </main>

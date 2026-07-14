@@ -45,8 +45,6 @@
         elements.resetButton = document.getElementById('resetButton');
         elements.downloadButton = document.getElementById('downloadButton');
         elements.downloadGeoButton = document.getElementById('downloadGeoButton');
-        elements.geometrySvg = document.getElementById('geometrySvg');
-        elements.previewContainer = document.getElementById('previewContainer');
         elements.legend = document.getElementById('legend');
     }
 
@@ -224,8 +222,13 @@
     function initialize() {
         initializeElements();
         
-        // Initialize renderer
-        Renderer.initialize(elements.geometrySvg, elements.previewContainer);
+        // Initialize renderer with both SVG elements
+        const mainSvg = document.getElementById('mainSvg');
+        const mainContainer = document.getElementById('mainViewContainer');
+        const detailSvg = document.getElementById('detailSvg');
+        const detailContainer = document.getElementById('detailViewContainer');
+        
+        Renderer.initialize(mainSvg, mainContainer, detailSvg, detailContainer);
 
         // Set default parameters
         const defaultParams = Geometry.getDefaultParameters();
