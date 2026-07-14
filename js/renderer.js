@@ -17,6 +17,9 @@ const Renderer = (function() {
     let scale = 1;
     let offsetX = 0;
     let offsetY = 0;
+    let scaleInitialized = false; // Flag to prevent scale recalculation
+    let viewBoxWidth = 0;
+    let viewBoxHeight = 0;
 
     const MARGIN = 40; // Margin around geometry in pixels
     const AXIS_LENGTH = 10; // Length of axis lines in mm
@@ -58,27 +61,32 @@ const Renderer = (function() {
         const containerWidth = containerElement.clientWidth;
         const containerHeight = containerElement.clientHeight;
 
-        // Calculate bounding box in model coordinates (mm)
-        const maxWidth = params.fingerWidth;
-        const maxHeight = params.fingerHeight;
-        
-        // Add some padding for axes and labels
-        const modelWidth = maxWidth + AXIS_LENGTH * 2;
-        const modelHeight = maxHeight + AXIS_LENGTH * 2;
+        // Calculate scale, offset, and viewBox only once (on first render with valid container size)
+        if (!scaleInitialized && containerWidth > 0 && containerHeight > 0) {
+            // Calculate bounding box in model coordinates (mm)
+            const modelWidth = params.fingerWidth + AXIS_LENGTH * 2;
+            const modelHeight = params.fingerHeight + AXIS_LENGTH * 2;
+            
+            // Calculate scale to fit in container with margins
+            const scaleX = (containerWidth - 2 * MARGIN) / modelWidth;
+            const scaleY = (containerHeight - 2 * MARGIN) / modelHeight;
+            scale = Math.min(scaleX, scaleY);
+            
+            // Fix center position
+            offsetX = containerWidth / 2;
+            offsetY = containerHeight / 2;
+            
+            // Fix viewBox dimensions
+            viewBoxWidth = containerWidth;
+            viewBoxHeight = containerHeight;
+            
+            scaleInitialized = true;
+        }
 
-        // Calculate scale to fit in container with margins
-        const scaleX = (containerWidth - 2 * MARGIN) / modelWidth;
-        const scaleY = (containerHeight - 2 * MARGIN) / modelHeight;
-        scale = Math.min(scaleX, scaleY);
-
-        // Center the geometry
-        offsetX = containerWidth / 2;
-        offsetY = containerHeight / 2;
-
-        // Update SVG viewBox
-        svgElement.setAttribute('width', containerWidth);
-        svgElement.setAttribute('height', containerHeight);
-        svgElement.setAttribute('viewBox', `0 0 ${containerWidth} ${containerHeight}`);
+        // Use fixed viewBox dimensions
+        svgElement.setAttribute('width', viewBoxWidth);
+        svgElement.setAttribute('height', viewBoxHeight);
+        svgElement.setAttribute('viewBox', `0 0 ${viewBoxWidth} ${viewBoxHeight}`);
     }
 
     /**
