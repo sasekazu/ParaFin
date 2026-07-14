@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParaFin - Parametric Finger Geometry Generator</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h1>ParaFin</h1>
+        <p class="subtitle">Parametric Finger Geometry Generator</p>
+    </header>
+
+    <div class="container">
+        <!-- Left Panel: Parameters -->
+        <aside class="parameters-panel">
+            <div class="error-summary" id="errorSummary"></div>
+
+            <!-- Finger Section -->
+            <section class="param-section">
+                <h2>Finger</h2>
+                <div class="param-group">
+                    <label for="fingerWidth">
+                        <span class="parameter-name">Finger width</span><span class="parameter-symbol">, <i>w</i><sub>f</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="fingerWidth" step="0.1" min="1" aria-label="Finger width w sub f in millimeters">
+                    <input type="range" id="fingerWidthSlider" min="1" max="40" step="0.1" aria-label="Finger width slider">
+                    <div class="error-message" id="errorFingerWidth"></div>
+                </div>
+                <div class="param-group">
+                    <label for="fingerHeight">
+                        <span class="parameter-name">Finger height</span><span class="parameter-symbol">, <i>h</i><sub>f</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="fingerHeight" step="0.1" min="1" aria-label="Finger height h sub f in millimeters">
+                    <input type="range" id="fingerHeightSlider" min="1" max="40" step="0.1" aria-label="Finger height slider">
+                    <div class="error-message" id="errorFingerHeight"></div>
+                </div>
+            </section>
+
+            <!-- Tissue Layers Section -->
+            <section class="param-section">
+                <h2>Tissue Layers</h2>
+                <div class="param-group">
+                    <label for="stratumCorneumThickness">
+                        <span class="parameter-name">Stratum corneum thickness</span><span class="parameter-symbol">, <i>t</i><sub>sc</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="stratumCorneumThickness" step="0.01" min="0" aria-label="Stratum corneum thickness t sub sc in millimeters">
+                    <input type="range" id="stratumCorneumThicknessSlider" min="0" max="1" step="0.01" aria-label="Stratum corneum thickness slider">
+                    <div class="error-message" id="errorStratumCorneumThickness"></div>
+                </div>
+                <div class="param-group">
+                    <label for="epidermisThickness">
+                        <span class="parameter-name">Epidermis thickness</span><span class="parameter-symbol">, <i>t</i><sub>e</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="epidermisThickness" step="0.01" min="0" aria-label="Epidermis thickness t sub e in millimeters">
+                    <input type="range" id="epidermisThicknessSlider" min="0" max="2" step="0.01" aria-label="Epidermis thickness slider">
+                    <div class="error-message" id="errorEpidermisThickness"></div>
+                </div>
+                <div class="param-group">
+                    <label for="dermisThickness">
+                        <span class="parameter-name">Dermis thickness</span><span class="parameter-symbol">, <i>t</i><sub>d</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="dermisThickness" step="0.1" min="0" aria-label="Dermis thickness t sub d in millimeters">
+                    <input type="range" id="dermisThicknessSlider" min="0" max="5" step="0.1" aria-label="Dermis thickness slider">
+                    <div class="error-message" id="errorDermisThickness"></div>
+                </div>
+            </section>
+
+            <!-- Bone Section -->
+            <section class="param-section">
+                <h2>Bone</h2>
+                <div class="param-group">
+                    <label for="boneWidth">
+                        <span class="parameter-name">Bone width</span><span class="parameter-symbol">, <i>w</i><sub>b</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="boneWidth" step="0.1" min="0.1" aria-label="Bone width w sub b in millimeters">
+                    <input type="range" id="boneWidthSlider" min="0.1" max="20" step="0.1" aria-label="Bone width slider">
+                    <div class="error-message" id="errorBoneWidth"></div>
+                </div>
+                <div class="param-group">
+                    <label for="boneHeight">
+                        <span class="parameter-name">Bone height</span><span class="parameter-symbol">, <i>h</i><sub>b</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="boneHeight" step="0.1" min="0.1" aria-label="Bone height h sub b in millimeters">
+                    <input type="range" id="boneHeightSlider" min="0.1" max="20" step="0.1" aria-label="Bone height slider">
+                    <div class="error-message" id="errorBoneHeight"></div>
+                </div>
+                <div class="param-group">
+                    <label for="boneOffsetY">
+                        <span class="parameter-name">Bone vertical offset</span><span class="parameter-symbol">, <i>e</i><sub>b</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="boneOffsetY" step="0.1" aria-label="Bone vertical offset e sub b in millimeters">
+                    <input type="range" id="boneOffsetYSlider" min="-10" max="10" step="0.1" aria-label="Bone vertical offset slider">
+                    <div class="error-message" id="errorBoneOffsetY"></div>
+                </div>
+            </section>
+
+            <!-- Nail Section -->
+            <section class="param-section">
+                <h2>Nail</h2>
+                <div class="param-group">
+                    <label for="nailAngularExtent">
+                        <span class="parameter-name">Nail angular extent</span><span class="parameter-symbol">, &alpha;<sub>n</sub></span>
+                        <span class="parameter-unit">[deg]</span>
+                    </label>
+                    <input type="number" id="nailAngularExtent" step="1" min="0" max="180" aria-label="Nail angular extent alpha sub n in degrees">
+                    <input type="range" id="nailAngularExtentSlider" min="0" max="180" step="1" aria-label="Nail angular extent slider">
+                    <div class="error-message" id="errorNailAngularExtent"></div>
+                    <small style="color: #666; font-size: 0.75rem;">Symmetric around dorsal apex (90°)</small>
+                </div>
+            </section>
+
+            <!-- Action Buttons -->
+            <div class="actions">
+                <button id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
+                <button id="downloadButton" class="btn btn-primary">Download JSON</button>
+            </div>
+        </aside>
+
+        <!-- Right Panel: Geometry Preview -->
+        <main class="preview-panel">
+            <div class="preview-header">
+                <h2>Geometry Preview</h2>
+            </div>
+            <div class="preview-container" id="previewContainer">
+                <svg id="geometrySvg"></svg>
+            </div>
+            <div class="legend" id="legend"></div>
+        </main>
+    </div>
+
+    <script src="js/geometry.js"></script>
+    <script src="js/renderer.js"></script>
+    <script src="js/exporter.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
