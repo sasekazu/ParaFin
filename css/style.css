@@ -25,26 +25,27 @@ body {
 header {
     background-color: #2c3e50;
     color: white;
-    padding: 1.5rem 2rem;
+    padding: 0.75rem 2rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 header h1 {
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 600;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0;
 }
 
 header .subtitle {
-    font-size: 1rem;
+    font-size: 0.9rem;
     opacity: 0.9;
     font-weight: 300;
+    margin-left: 1rem;
 }
 
 /* Main container */
 .container {
     display: flex;
-    height: calc(100vh - 100px);
+    height: calc(100vh - 60px);
     gap: 0;
 }
 
