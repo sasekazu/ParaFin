@@ -76,6 +76,24 @@ Use for mesh generation in Gmsh, FEniCS, or custom tools.
 
 ---
 
+## GEO Export
+
+Exports **geometry-only** `.geo` files for [Gmsh](https://gmsh.info/):
+- 6 tissue layers: stratum corneum, epidermis, dermis, subcutaneous, bone, nail
+- Ellipse arcs split at nail boundaries (no Boolean operations)
+- Shared curve IDs between adjacent tissues (no duplicate boundaries)
+- Physical Surface and Physical Curve definitions
+
+**Mesh settings are NOT included in the GEO file.** Configure mesh resolution (element size, refinement, etc.) in Gmsh GUI or via command-line options:
+
+```bash
+gmsh parafin-model.geo -2 -clmin 0.02 -clmax 0.5
+```
+
+This design philosophy keeps geometry definition separate from mesh generation, allowing flexible mesh experimentation without regenerating the geometry.
+
+---
+
 ## Approximations
 
 ⚠️ **Tissue layer boundaries use simplified ellipse scaling**, not true normal offset:

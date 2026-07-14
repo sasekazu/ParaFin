@@ -43,6 +43,7 @@
         elements.errorSummary = document.getElementById('errorSummary');
         elements.resetButton = document.getElementById('resetButton');
         elements.downloadButton = document.getElementById('downloadButton');
+        elements.downloadGeoButton = document.getElementById('downloadGeoButton');
         elements.geometrySvg = document.getElementById('geometrySvg');
         elements.previewContainer = document.getElementById('previewContainer');
         elements.legend = document.getElementById('legend');
@@ -114,8 +115,9 @@
             }
         }
 
-        // Disable download button
+        // Disable download buttons
         elements.downloadButton.disabled = true;
+        elements.downloadGeoButton.disabled = true;
     }
 
     /**
@@ -130,6 +132,7 @@
         if (validation.valid) {
             clearErrors();
             elements.downloadButton.disabled = false;
+            elements.downloadGeoButton.disabled = false;
 
             // Generate geometry
             const geometry = Geometry.generateGeometry(currentParams);
@@ -182,7 +185,7 @@
             updateGeometry();
         });
 
-        // Download button
+        // Download JSON button
         elements.downloadButton.addEventListener('click', function() {
             if (this.disabled) return;
 
@@ -192,6 +195,19 @@
             if (validation.valid) {
                 const geometry = Geometry.generateGeometry(params);
                 Exporter.downloadJSON(params, geometry);
+            }
+        });
+
+        // Download GEO button
+        elements.downloadGeoButton.addEventListener('click', function() {
+            if (this.disabled) return;
+
+            const params = getCurrentParameters();
+            const validation = Geometry.validateParameters(params);
+
+            if (validation.valid) {
+                const geometry = Geometry.generateGeometry(params);
+                Exporter.downloadGEO(params, geometry);
             }
         });
 
