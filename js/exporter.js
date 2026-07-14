@@ -39,13 +39,22 @@ const Exporter = (function() {
                 boneWidth: params.boneWidth,
                 boneHeight: params.boneHeight,
                 boneOffsetY: params.boneOffsetY,
-                nailAngularExtent: params.nailAngularExtent
+                nailAngularExtent: params.nailAngularExtent,
+                fingerprintAngularExtent: params.fingerprintAngularExtent,
+                fingerprintWavelength: params.fingerprintWavelength,
+                fingerprintRidgeHeight: params.fingerprintRidgeHeight
             },
             derivedValues: {
                 boneOffsetX: 0,
                 nailThickness: params.stratumCorneumThickness + params.epidermisThickness,
                 nailStartAngle: 90 - params.nailAngularExtent / 2,
-                nailEndAngle: 90 + params.nailAngularExtent / 2
+                nailEndAngle: 90 + params.nailAngularExtent / 2,
+                fingerprintMode: params.fingerprintRidgeHeight > 0 ? 'enabled' : 'disabled',
+                fingerprint: geometry.fingerprintMetadata || {
+                    requestedAngularExtent: params.fingerprintAngularExtent,
+                    actualAngularExtent: 0,
+                    ridgeCount: 0
+                }
             },
             geometry: {
                 boundaries: geometry.boundaries,
@@ -53,11 +62,15 @@ const Exporter = (function() {
             },
             notes: {
                 approximation: 'Tissue layer boundaries use simplified ellipse scaling (width/height reduction) rather than true normal offset',
-                assumptions: 'No fingerprint ridges, smooth epidermal-dermal junction',
-                nailModel: 'Nail thickness equals stratum corneum + epidermis (nail replaces these layers). Nail arc is symmetric around dorsal apex (90°).'
+                assumptions: params.fingerprintRidgeHeight === 0 
+                    ? 'No fingerprint ridges, smooth epidermal surface'
+                    : 'Fingerprint ridges applied to palmar surface with integer periods, smooth transitions at boundaries',
+                nailModel: 'Nail thickness equals stratum corneum + epidermis (nail replaces these layers). Nail arc is symmetric around dorsal apex (90°).',
+                fingerprintModel: params.fingerprintRidgeHeight === 0
+                    ? 'Fingerprint ridge height = 0: smooth elliptical surface (same as legacy behavior)'
+                    : `Fingerprint ridges with integer periods (odd count, ridge peak at palmar center). Displacement: d(s) = h_r/2 * (1 + cos(2πs/λ_r)). Requested extent: ${params.fingerprintAngularExtent}°, actual extent: ${geometry.fingerprintMetadata?.actualAngularExtent?.toFixed(2) || 0}°, ridge count: ${geometry.fingerprintMetadata?.ridgeCount || 0}. Wavelength: ${params.fingerprintWavelength} mm, height: ${params.fingerprintRidgeHeight} mm.`
             },
             extensionReserved: {
-                fingerprint: null,
                 epidermalRidges: null,
                 receptors: null,
                 meshSize: null
@@ -117,9 +130,32 @@ const Exporter = (function() {
         geo.push('// Unit: mm');
         geo.push('// Coordinate system: origin at finger center, +Y dorsal, Z=0');
         geo.push('// Mesh settings are controlled in Gmsh');
+        if (params.fingerprintRidgeHeight > 0) {
+            const fpMeta = geometry.fingerprintMetadata || {};
+            geo.push('//');
+            geo.push('// FINGERPRINT MODE ACTIVE:');
+            geo.push(`//   Ridge height: ${params.fingerprintRidgeHeight} mm`);
+            geo.push(`//   Wavelength: ${params.fingerprintWavelength} mm`);
+            geo.push(`//   Requested angular extent: ${params.fingerprintAngularExtent}°`);
+            geo.push(`//   Actual angular extent: ${fpMeta.actualAngularExtent?.toFixed(2) || 0}°`);
+            geo.push(`//   Ridge count: ${fpMeta.ridgeCount || 0} (odd number, peak at palmar center)`);
+            geo.push('//   Displacement function: d(s) = h_r/2 * (1 + cos(2πs/λ_r))');
+            geo.push('//   Note: Parametric curves (BSplines) used for finger outer and stratum corneum inner boundaries');
+            geo.push('//');
+        }
         geo.push('');
         geo.push('SetFactory("OpenCASCADE");');
         geo.push('');
+        
+        // Check if fingerprint mode is active
+        const hasFingerprintRidges = params.fingerprintRidgeHeight > 0;
+        if (hasFingerprintRidges) {
+            geo.push('// WARNING: Fingerprint mode is active.');
+            geo.push('// The finger-outer and stratum-corneum-inner boundaries are exported as BSplines.');
+            geo.push('// Complex topology with nail region may require manual adjustment in Gmsh.');
+            geo.push('// For simpler meshing, consider setting fingerprintRidgeHeight to 0.');
+            geo.push('');
+        }
 
         // Store mapping of boundary ID to curve IDs and points
         const boundaryToCurves = {};
@@ -129,6 +165,30 @@ const Exporter = (function() {
         const nailBoundary = geometry.boundaries.find(b => b.id === 'nail');
         const nailStartAngle = nailBoundary.startAngle;
         const nailEndAngle = nailBoundary.endAngle;
+
+        // Helper: Create parametric curve boundary (for fingerprint ridges)
+        function createParametricCurveBoundary(boundary, comment) {
+            geo.push(`// ${comment} (Parametric Curve with ${boundary.points.length} points)`);
+            
+            // Create points from parametric curve
+            const pointIds = [];
+            for (let i = 0; i < boundary.points.length; i++) {
+                const pid = pointId++;
+                const pt = boundary.points[i];
+                geo.push(`Point(${pid}) = {${fmt(pt.x)}, ${fmt(pt.y)}, 0};`);
+                pointIds.push(pid);
+            }
+            
+            // Create BSpline curve through all points
+            const splineId = curveId++;
+            geo.push(`BSpline(${splineId}) = {${pointIds.join(', ')}};`);
+            geo.push('');
+            
+            boundaryToCurves[boundary.id] = [splineId];
+            boundaryToPoints[boundary.id] = { pointIds };
+            
+            return [splineId];
+        }
 
         // Helper: Create split ellipse boundary (split by nail angles)
         function createSplitEllipseBoundary(boundary, comment, skipNailRegion = false) {
@@ -267,18 +327,16 @@ const Exporter = (function() {
         }
 
         // Create boundaries
-        const fingerOuterCurves = createSplitEllipseBoundary(
-            geometry.boundaries.find(b => b.id === 'finger-outer'),
-            'Finger outer boundary',
-            false   // Don't skip nail region
-        );
+        const fingerOuterBoundary = geometry.boundaries.find(b => b.id === 'finger-outer');
+        const fingerOuterCurves = (fingerOuterBoundary.type === 'parametric-curve')
+            ? createParametricCurveBoundary(fingerOuterBoundary, 'Finger outer boundary (with fingerprint ridges)')
+            : createSplitEllipseBoundary(fingerOuterBoundary, 'Finger outer boundary', false);
         const fingerOuterPoints = boundaryToPoints['finger-outer'];
 
-        const scInnerCurves = createSplitEllipseBoundary(
-            geometry.boundaries.find(b => b.id === 'stratum-corneum-inner'),
-            'Stratum corneum inner boundary',
-            true    // Skip nail region (only create arcs outside nail)
-        );
+        const scInnerBoundary = geometry.boundaries.find(b => b.id === 'stratum-corneum-inner');
+        const scInnerCurves = (scInnerBoundary.type === 'parametric-curve')
+            ? createParametricCurveBoundary(scInnerBoundary, 'Stratum corneum inner boundary (with fingerprint ridges)')
+            : createSplitEllipseBoundary(scInnerBoundary, 'Stratum corneum inner boundary', true);
         const scInnerPoints = boundaryToPoints['stratum-corneum-inner'];
 
         const epidermisInnerCurves = createSplitEllipseBoundary(
@@ -297,6 +355,25 @@ const Exporter = (function() {
             geometry.boundaries.find(b => b.id === 'bone'),
             'Bone boundary'
         );
+
+        // If fingerprint mode is active (parametric curves), use simplified topology
+        if (hasFingerprintRidges) {
+            geo.push('// Simplified topology for fingerprint mode');
+            geo.push('// Note: Nail region and complex curve loops are not yet supported with BSpline boundaries');
+            geo.push('// Boundaries are exported for reference, but surfaces may need manual definition in Gmsh');
+            geo.push('');
+            
+            // Export basic physical curves
+            geo.push('// Physical Curves (Boundaries)');
+            geo.push(`Physical Curve("Finger Outer", 1) = {${fingerOuterCurves.join(', ')}};`);
+            geo.push(`Physical Curve("Stratum Corneum Inner", 2) = {${scInnerCurves.join(', ')}};`);
+            geo.push(`Physical Curve("Epidermis Inner", 3) = {${epidermisInnerCurves.join(', ')}};`);
+            geo.push(`Physical Curve("Dermis Inner", 4) = {${dermisInnerCurves.join(', ')}};`);
+            geo.push(`Physical Curve("Bone", 5) = {${boneCurves.join(', ')}};`);
+            geo.push('');
+            
+            return geo.join('\n');
+        }
 
         // Create connecting lines between split boundaries
         geo.push('// Connecting lines at nail edges');

@@ -8,8 +8,7 @@
 </head>
 <body>
     <header>
-        <h1>ParaFin</h1>
-        <p class="subtitle">Parametric Finger Geometry Generator</p>
+        <h1>ParaFin <span class="subtitle">Parametric Finger Geometry Generator</span></h1>
     </header>
 
     <div class="container">
@@ -119,6 +118,40 @@
                 </div>
             </section>
 
+            <!-- Fingerprint Section -->
+            <section class="param-section">
+                <h2>Fingerprint</h2>
+                <div class="param-group">
+                    <label for="fingerprintAngularExtent">
+                        <span class="parameter-name">Fingerprint angular extent</span><span class="parameter-symbol">, &alpha;<sub>r</sub></span>
+                        <span class="parameter-unit">[deg]</span>
+                    </label>
+                    <input type="number" id="fingerprintAngularExtent" step="1" min="0" max="180" aria-label="Fingerprint angular extent alpha sub r in degrees">
+                    <input type="range" id="fingerprintAngularExtentSlider" min="0" max="180" step="1" aria-label="Fingerprint angular extent slider">
+                    <div class="error-message" id="errorFingerprintAngularExtent"></div>
+                    <small style="color: #666; font-size: 0.75rem;">Palmar surface region (centered at 270°)</small>
+                </div>
+                <div class="param-group">
+                    <label for="fingerprintWavelength">
+                        <span class="parameter-name">Fingerprint wavelength</span><span class="parameter-symbol">, &lambda;<sub>r</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="fingerprintWavelength" step="0.01" min="0.1" aria-label="Fingerprint wavelength lambda sub r in millimeters">
+                    <input type="range" id="fingerprintWavelengthSlider" min="0.1" max="5" step="0.01" aria-label="Fingerprint wavelength slider">
+                    <div class="error-message" id="errorFingerprintWavelength"></div>
+                </div>
+                <div class="param-group">
+                    <label for="fingerprintRidgeHeight">
+                        <span class="parameter-name">Fingerprint ridge height</span><span class="parameter-symbol">, h<sub>r</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="fingerprintRidgeHeight" step="0.001" min="0" aria-label="Fingerprint ridge height h sub r in millimeters">
+                    <input type="range" id="fingerprintRidgeHeightSlider" min="0" max="0.2" step="0.001" aria-label="Fingerprint ridge height slider">
+                    <div class="error-message" id="errorFingerprintRidgeHeight"></div>
+                    <small style="color: #666; font-size: 0.75rem;">h<sub>r</sub> = 0: smooth ellipse (default)</small>
+                </div>
+            </section>
+
             <!-- Action Buttons -->
             <div class="actions">
                 <button id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
@@ -132,8 +165,19 @@
             <div class="preview-header">
                 <h2>Geometry Preview</h2>
             </div>
-            <div class="preview-container" id="previewContainer">
-                <svg id="geometrySvg"></svg>
+            <div class="preview-views">
+                <div class="view-container main-view">
+                    <h3 class="view-title">Cross Section (Full View)</h3>
+                    <div class="svg-container" id="mainViewContainer">
+                        <svg id="mainSvg"></svg>
+                    </div>
+                </div>
+                <div class="view-container detail-view">
+                    <h3 class="view-title">Fingerprint Detail (Magnified)</h3>
+                    <div class="svg-container" id="detailViewContainer">
+                        <svg id="detailSvg"></svg>
+                    </div>
+                </div>
             </div>
             <div class="legend" id="legend"></div>
         </main>
