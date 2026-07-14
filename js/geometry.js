@@ -44,7 +44,10 @@ const Geometry = (function() {
         boneWidth: 6,
         boneHeight: 3,
         boneOffsetY: 2,
-        nailAngularExtent: 108  // Symmetric around dorsal apex (90°)
+        nailAngularExtent: 108,  // Symmetric around dorsal apex (90°)
+        fingerprintAngularExtent: 140,  // Palmar region extent (minimum)
+        fingerprintWavelength: 0.5,     // Ridge wavelength in mm
+        fingerprintRidgeHeight: 0.1     // Ridge height in mm
     };
 
     // Tissue colors for visualization
@@ -161,6 +164,36 @@ const Geometry = (function() {
             isValid = false;
         }
 
+        // Fingerprint parameter validation
+        if (params.fingerprintAngularExtent < 0) {
+            errors.fingerprintAngularExtent = 'Cannot be negative';
+            isValid = false;
+        }
+        if (params.fingerprintAngularExtent > 180) {
+            errors.fingerprintAngularExtent = 'Cannot exceed 180°';
+            isValid = false;
+        }
+        
+        if (params.fingerprintWavelength <= 0) {
+            errors.fingerprintWavelength = 'Must be greater than 0';
+            isValid = false;
+        }
+        if (params.fingerprintWavelength < 0.1) {
+            errors.fingerprintWavelength = 'Minimum wavelength is 0.1 mm (to avoid excessive point count)';
+            isValid = false;
+        }
+        
+        if (params.fingerprintRidgeHeight < 0) {
+            errors.fingerprintRidgeHeight = 'Cannot be negative';
+            isValid = false;
+        }
+        // Ridge height upper limit
+        const maxRidgeHeight = 0.2;
+        if (params.fingerprintRidgeHeight > maxRidgeHeight) {
+            errors.fingerprintRidgeHeight = `Cannot exceed ${maxRidgeHeight.toFixed(1)} mm`;
+            isValid = false;
+        }
+
         return { valid: isValid, errors };
     }
 
@@ -243,6 +276,186 @@ const Geometry = (function() {
     }
 
     /**
+     * Generate fingerprint boundary with sinusoidal ridges
+     * Returns a parametric curve (point array) when ridgeHeight > 0, otherwise returns ellipse boundary
+     * @param {string} id - Boundary ID
+     * @param {string} tissueType - Tissue type
+     * @param {number} centerX - Center X coordinate (mm)
+     * @param {number} centerY - Center Y coordinate (mm)
+     * @param {number} width - Ellipse width (mm)
+     * @param {number} height - Ellipse height (mm)
+     * @param {number} angularExtent - Angular extent of fingerprint region (degrees)
+     * @param {number} wavelength - Ridge wavelength (mm)
+     * @param {number} ridgeHeight - Ridge height (mm), 0 = smooth ellipse
+     * @returns {Object} Boundary object
+     */
+    /**
+     * Generate fingerprint boundary pair (outer surface and stratum corneum inner surface)
+     * with phase-matched ridges to ensure constant thickness along normals.
+     * 
+     * Ridges are defined with integer periods, smoothly transitioning at boundaries:
+     * - d(s) = h_r / 2 * (1 + cos(2πs / λ_r))
+     * - At palmar center (s=0): d = h_r (ridge peak)
+     * - At period boundaries (s = ±nλ/2): d = 0 and dd/ds = 0 (smooth connection to ellipse)
+     * - Ridge count is odd, with ridge peak at palmar center (270°)
+     * - Angular extent is expanded to fit integer periods symmetrically
+     * 
+     * @param {number} centerX - Center X coordinate
+     * @param {number} centerY - Center Y coordinate
+     * @param {number} outerWidth - Outer boundary width
+     * @param {number} outerHeight - Outer boundary height
+     * @param {number} stratumCorneumThickness - Stratum corneum thickness (t_sc)
+     * @param {number} angularExtent - Minimum fingerprint angular extent (α_r, requested)
+     * @param {number} wavelength - Fingerprint wavelength (λ_r)
+     * @param {number} ridgeHeight - Fingerprint ridge height (h_r)
+     * @returns {Object} Object with outerBoundary, innerBoundary, and metadata
+     */
+    function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHeight, stratumCorneumThickness, angularExtent, wavelength, ridgeHeight) {
+        const rx_outer = outerWidth / 2;
+        const ry_outer = outerHeight / 2;
+        
+        // If ridgeHeight is 0, return standard ellipse boundaries
+        if (ridgeHeight === 0) {
+            return {
+                outerBoundary: createEllipseBoundary('finger-outer', 'outer-boundary', centerX, centerY, outerWidth, outerHeight),
+                innerBoundary: createEllipseBoundary('stratum-corneum-inner', 'stratum-corneum-inner', centerX, centerY, 
+                    outerWidth - 2 * stratumCorneumThickness, outerHeight - 2 * stratumCorneumThickness),
+                metadata: {
+                    requestedAngularExtent: angularExtent,
+                    actualAngularExtent: 0,
+                    ridgeCount: 0
+                }
+            };
+        }
+        
+        // Calculate circumference using Ramanujan's approximation
+        const a = Math.max(rx_outer, ry_outer);
+        const b = Math.min(rx_outer, ry_outer);
+        const h = Math.pow((a - b) / (a + b), 2);
+        const circumference = Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+        
+        // Estimate arc length for requested angular extent (approximate)
+        const requestedArcLength = (angularExtent / 360) * circumference;
+        
+        // Calculate minimum ridge count to satisfy requested extent
+        const minRidgeCount = Math.ceil(requestedArcLength / wavelength);
+        
+        // Round up to nearest odd number (so ridge peak is at palmar center)
+        const ridgeCount = (minRidgeCount % 2 === 0) ? minRidgeCount + 1 : minRidgeCount;
+        
+        // Actual arc length with integer periods
+        const actualArcLength = ridgeCount * wavelength;
+        
+        // Calculate actual angular extent (approximate, using linear relation)
+        const actualAngularExtent = (actualArcLength / circumference) * 360;
+        
+        // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
+        const palmarCenter = 270; // degrees
+        const palmarStart = palmarCenter - actualAngularExtent / 2;
+        const palmarEnd = palmarCenter + actualAngularExtent / 2;
+        
+        // Calculate arc length at palmar center (reference point for phase = 0)
+        const palmarCenterRad = palmarCenter * Math.PI / 180;
+        const palmarCenterArcLength = (palmarCenter / 360) * circumference;
+        
+        // Use ~15 points per wavelength for smooth visualization
+        const pointsPerWavelength = 15;
+        const estimatedWavelengthCount = circumference / wavelength;
+        const totalPoints = Math.max(100, Math.ceil(estimatedWavelengthCount * pointsPerWavelength));
+        
+        const outerPoints = [];
+        const innerPoints = [];
+        
+        // Generate points around the ellipse
+        for (let i = 0; i < totalPoints; i++) {
+            const theta = (i / totalPoints) * 360; // degrees
+            const thetaRad = theta * Math.PI / 180;
+            
+            // Base ellipse point on outer reference ellipse
+            const x0_outer = rx_outer * Math.cos(thetaRad);
+            const y0_outer = ry_outer * Math.sin(thetaRad);
+            
+            // Calculate arc length up to this point using outer ellipse
+            const t = i / totalPoints;
+            const s_outer = t * circumference;
+            
+            // Arc length relative to palmar center
+            let s_relative = s_outer - palmarCenterArcLength;
+            // Normalize to [-circumference/2, circumference/2]
+            if (s_relative > circumference / 2) {
+                s_relative -= circumference;
+            } else if (s_relative < -circumference / 2) {
+                s_relative += circumference;
+            }
+            
+            // Calculate outward normal vector for outer ellipse
+            // For ellipse (rx*cos(θ), ry*sin(θ)), the outward normal is proportional to (cos(θ)/rx, sin(θ)/ry)
+            const nx = Math.cos(thetaRad) / rx_outer;
+            const ny = Math.sin(thetaRad) / ry_outer;
+            const nMag = Math.sqrt(nx * nx + ny * ny);
+            const nxNorm = nx / nMag;
+            const nyNorm = ny / nMag;
+            
+            // Check if this point is in the fingerprint region
+            let inFingerprintRegion = false;
+            if (palmarStart < palmarEnd) {
+                inFingerprintRegion = (theta >= palmarStart && theta <= palmarEnd);
+            } else {
+                // Handle wrap-around (unlikely for palmar region)
+                inFingerprintRegion = (theta >= palmarStart || theta <= palmarEnd);
+            }
+            
+            // Calculate displacement: d(s) = h_r / 2 * (1 - cos(2πs / λ_r))
+            // At palmar center (s_relative = 0), we want a ridge peak (d = h_r)
+            // Standard formula gives d(0) = 0 (valley), so shift phase by π:
+            // d(s) = h_r / 2 * (1 - cos(2πs / λ_r + π)) = h_r / 2 * (1 + cos(2πs / λ_r))
+            // This ensures d = 0 and dd/ds = 0 at period boundaries (s = ±nλ/2)
+            let displacement = 0;
+            if (inFingerprintRegion && ridgeHeight > 0) {
+                const phase = 2 * Math.PI * s_relative / wavelength;
+                displacement = (ridgeHeight / 2) * (1 + Math.cos(phase));
+            }
+            
+            // Outer surface = base + displacement * n
+            const x_outer = x0_outer + displacement * nxNorm;
+            const y_outer = y0_outer + displacement * nyNorm;
+            
+            // Inner surface = outer surface - t_sc * n (constant thickness along normal)
+            const x_inner = x_outer - stratumCorneumThickness * nxNorm;
+            const y_inner = y_outer - stratumCorneumThickness * nyNorm;
+            
+            outerPoints.push({ x: centerX + x_outer, y: centerY + y_outer });
+            innerPoints.push({ x: centerX + x_inner, y: centerY + y_inner });
+        }
+        
+        return {
+            outerBoundary: {
+                id: 'finger-outer',
+                type: 'parametric-curve',
+                tissueType: 'outer-boundary',
+                center: [centerX, centerY],
+                width: outerWidth,
+                height: outerHeight,
+                points: outerPoints
+            },
+            innerBoundary: {
+                id: 'stratum-corneum-inner',
+                type: 'parametric-curve',
+                tissueType: 'stratum-corneum-inner',
+                center: [centerX, centerY],
+                width: outerWidth - 2 * stratumCorneumThickness,
+                height: outerHeight - 2 * stratumCorneumThickness,
+                points: innerPoints
+            },
+            metadata: {
+                requestedAngularExtent: angularExtent,
+                actualAngularExtent: actualAngularExtent,
+                ridgeCount: ridgeCount
+            }
+        };
+    }
+
+    /**
      * Generate complete geometric model from parameters
      * Uses simplified ellipse scaling: inner ellipse dimensions are reduced by 2 × thickness
      * @param {Object} params - Parameter object
@@ -256,27 +469,19 @@ const Geometry = (function() {
         const outerRx = params.fingerWidth / 2;
         const outerRy = params.fingerHeight / 2;
 
-        // 1. Finger outer boundary
-        const fingerOuter = createEllipseBoundary(
-            'finger-outer',
-            'outer-boundary',
+        // 1 & 2. Generate finger outer boundary and stratum corneum inner boundary as a phase-matched pair
+        // This ensures the fingerprint ridges and valleys are perfectly aligned with constant t_sc thickness
+        const fingerprintPair = generateFingerprintBoundariesPair(
             0, 0,
             params.fingerWidth,
-            params.fingerHeight
+            params.fingerHeight,
+            params.stratumCorneumThickness,
+            params.fingerprintAngularExtent,
+            params.fingerprintWavelength,
+            params.fingerprintRidgeHeight
         );
-        boundaries.push(fingerOuter);
-
-        // 2. Stratum corneum inner boundary (cumulative thickness from outer radius)
-        const scInnerRx = outerRx - params.stratumCorneumThickness;
-        const scInnerRy = outerRy - params.stratumCorneumThickness;
-        const stratumCorneumInner = createEllipseBoundary(
-            'stratum-corneum-inner',
-            'stratum-corneum-inner',
-            0, 0,
-            scInnerRx * 2,
-            scInnerRy * 2
-        );
-        boundaries.push(stratumCorneumInner);
+        boundaries.push(fingerprintPair.outerBoundary);
+        boundaries.push(fingerprintPair.innerBoundary);
 
         // 3. Epidermis inner boundary (cumulative thickness from outer radius)
         const epidermisInnerRx = outerRx - params.stratumCorneumThickness - params.epidermisThickness;
@@ -389,7 +594,8 @@ const Geometry = (function() {
 
         return {
             boundaries,
-            regions
+            regions,
+            fingerprintMetadata: fingerprintPair.metadata
         };
     }
 

@@ -24,7 +24,8 @@
         'fingerWidth', 'fingerHeight',
         'stratumCorneumThickness', 'epidermisThickness', 'dermisThickness',
         'boneWidth', 'boneHeight', 'boneOffsetY',
-        'nailAngularExtent'
+        'nailAngularExtent',
+        'fingerprintAngularExtent', 'fingerprintWavelength', 'fingerprintRidgeHeight'
     ];
 
     /**

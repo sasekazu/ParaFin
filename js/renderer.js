@@ -168,6 +168,40 @@ const Renderer = (function() {
     }
 
     /**
+     * Create SVG path from parametric curve (point array)
+     * @param {Array} points - Array of {x, y} points in model coordinates
+     * @param {string} fillColor - Fill color
+     * @param {string} strokeColor - Stroke color
+     * @param {number} strokeWidth - Stroke width
+     * @returns {SVGElement} Path element
+     */
+    function drawParametricCurve(points, fillColor, strokeColor, strokeWidth) {
+        if (!points || points.length === 0) return null;
+        
+        // Convert all points to screen coordinates
+        const screenPoints = points.map(p => modelToScreen(p.x, p.y));
+        
+        // Build SVG path data using smooth curve
+        let pathData = `M ${screenPoints[0].x} ${screenPoints[0].y}`;
+        
+        // Use line segments for simplicity (could use Catmull-Rom spline for smoother curves)
+        for (let i = 1; i < screenPoints.length; i++) {
+            pathData += ` L ${screenPoints[i].x} ${screenPoints[i].y}`;
+        }
+        
+        // Close the path
+        pathData += ' Z';
+        
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', pathData);
+        if (fillColor) path.setAttribute('fill', fillColor);
+        if (strokeColor) path.setAttribute('stroke', strokeColor);
+        if (strokeWidth) path.setAttribute('stroke-width', strokeWidth);
+        
+        return path;
+    }
+
+    /**
      * Draw a region
      * @param {Object} region - Region definition
      * @param {Object} boundaryMap - Map of boundary ID to boundary object
@@ -177,7 +211,74 @@ const Renderer = (function() {
         
         if (!outerBoundary) return;
 
-        if (outerBoundary.type === 'ellipse') {
+        if (outerBoundary.type === 'parametric-curve') {
+            // For parametric curve regions (fingerprint)
+            if (region.innerBoundary) {
+                const innerBoundary = boundaryMap[region.innerBoundary];
+                
+                if (innerBoundary && innerBoundary.type === 'parametric-curve') {
+                    // Ring region with both boundaries as parametric curves (e.g., stratum corneum with fingerprint)
+                    const outerScreenPoints = outerBoundary.points.map(p => modelToScreen(p.x, p.y));
+                    const innerScreenPoints = innerBoundary.points.map(p => modelToScreen(p.x, p.y));
+                    
+                    // Build path: outer curve (clockwise) + inner curve (counter-clockwise for hole)
+                    let pathData = `M ${outerScreenPoints[0].x} ${outerScreenPoints[0].y}`;
+                    for (let i = 1; i < outerScreenPoints.length; i++) {
+                        pathData += ` L ${outerScreenPoints[i].x} ${outerScreenPoints[i].y}`;
+                    }
+                    pathData += ' Z';
+                    
+                    // Inner curve (reversed for hole)
+                    pathData += ` M ${innerScreenPoints[0].x} ${innerScreenPoints[0].y}`;
+                    for (let i = innerScreenPoints.length - 1; i > 0; i--) {
+                        pathData += ` L ${innerScreenPoints[i].x} ${innerScreenPoints[i].y}`;
+                    }
+                    pathData += ' Z';
+                    
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', pathData);
+                    path.setAttribute('fill', region.color);
+                    path.setAttribute('fill-rule', 'evenodd');
+                    path.setAttribute('stroke', '#333');
+                    path.setAttribute('stroke-width', 0.5);
+                    
+                    svgElement.appendChild(path);
+                } else if (innerBoundary && innerBoundary.type === 'ellipse') {
+                    // Ring region with outer parametric curve and inner ellipse (e.g., epidermis with fingerprint)
+                    const outerScreenPoints = outerBoundary.points.map(p => modelToScreen(p.x, p.y));
+                    
+                    const innerCenter = modelToScreen(innerBoundary.center[0], innerBoundary.center[1]);
+                    const innerRx = innerBoundary.width / 2 * scale;
+                    const innerRy = innerBoundary.height / 2 * scale;
+                    
+                    // Build path: outer parametric curve + inner ellipse
+                    let pathData = `M ${outerScreenPoints[0].x} ${outerScreenPoints[0].y}`;
+                    for (let i = 1; i < outerScreenPoints.length; i++) {
+                        pathData += ` L ${outerScreenPoints[i].x} ${outerScreenPoints[i].y}`;
+                    }
+                    pathData += ' Z';
+                    
+                    // Inner ellipse (counter-clockwise for hole)
+                    pathData += ` M ${innerCenter.x - innerRx} ${innerCenter.y}`;
+                    pathData += ` A ${innerRx} ${innerRy} 0 0 1 ${innerCenter.x + innerRx} ${innerCenter.y}`;
+                    pathData += ` A ${innerRx} ${innerRy} 0 0 1 ${innerCenter.x - innerRx} ${innerCenter.y}`;
+                    pathData += ' Z';
+                    
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', pathData);
+                    path.setAttribute('fill', region.color);
+                    path.setAttribute('fill-rule', 'evenodd');
+                    path.setAttribute('stroke', '#333');
+                    path.setAttribute('stroke-width', 0.5);
+                    
+                    svgElement.appendChild(path);
+                }
+            } else {
+                // Simple filled parametric curve
+                const path = drawParametricCurve(outerBoundary.points, region.color, '#333', 1);
+                if (path) svgElement.appendChild(path);
+            }
+        } else if (outerBoundary.type === 'ellipse') {
             // For ellipse regions
             const outerCenter = modelToScreen(outerBoundary.center[0], outerBoundary.center[1]);
             const outerRx = outerBoundary.width / 2 * scale;
