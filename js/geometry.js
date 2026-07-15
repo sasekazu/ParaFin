@@ -544,17 +544,23 @@ const Geometry = (function() {
     /**
      * Generate epidermis-inner boundary with dermal papillae (epidermis-dermis interface ridges).
      *
-     * Reuses the same waveform approach as generateFingerprintBoundariesPair(), but applied to a
-     * single boundary (epidermis-inner) rather than a phase-matched pair, and driven by its own
-     * independent angular extent / wavelength / height parameters (NOT the fingerprint parameters):
-     * - d(s) = h_ed / 2 * (1 + cos(2πs / λ_ed))
-     * - At palmar center (s=0, 270°): d = h_ed (papilla peak, displaced along outward normal,
-     *   i.e. dermis protrudes toward the epidermis side)
-     * - At period boundaries (s = ±nλ/2): d = 0 and dd/ds = 0 (smooth connection to ellipse)
-     * - Ridge count is odd, with peak at palmar center (270°)
-     * - Angular extent is expanded to fit integer periods symmetrically
+     * Unlike generateFingerprintBoundariesPair() (which uses an always-non-negative waveform),
+     * the dermal papillae here use a signed sinusoidal displacement around the base epidermis-inner
+     * ellipse, driven by its own independent angular extent / wavelength / height parameters
+     * (NOT the fingerprint parameters):
+     * - epidermisDermisHeight (h_ed) is the peak-to-peak height: -h_ed/2 <= d(s) <= h_ed/2
+     * - d(s) = h_ed / 2 * cos(2π s_relative / λ_ed), where s_relative is the signed arc length
+     *   from the palmar center (s_relative = 0 at 270°)
+     * - At palmar center (s_relative = 0): d = +h_ed/2 (positive peak, displaced along outward
+     *   normal, i.e. dermis protrudes toward the epidermis side)
+     * - At the two ends of the applied region: d = 0 (zero-crossing, smooth connection to the
+     *   base ellipse)
+     * - The applied region is built from an odd number of half-waves (each of length λ_ed/2) so
+     *   that the center is always a positive peak and both ends are always zero-crossings.
+     * - The requested angular extent is expanded as needed (in half-wave steps) so that the
+     *   actual applied arc length ends exactly on a zero-crossing.
      *
-     * When papillaHeight <= EPS, returns a plain ellipse boundary (no points, no BSpline).
+     * When papillaHeight (h_ed) <= EPS, returns a plain ellipse boundary (no points, no BSpline).
      *
      * @param {number} centerX - Center X coordinate
      * @param {number} centerY - Center Y coordinate
@@ -562,7 +568,7 @@ const Geometry = (function() {
      * @param {number} height - Epidermis-inner ellipse height (base, undisplaced)
      * @param {number} angularExtent - Minimum dermal papillae angular extent (α_ed, requested)
      * @param {number} wavelength - Dermal papillae wavelength (λ_ed)
-     * @param {number} papillaHeight - Dermal papillae height (h_ed)
+     * @param {number} papillaHeight - Dermal papillae peak-to-peak height (h_ed)
      * @returns {Object} Object with boundary and metadata
      */
     function generateEpidermisDermisBoundary(centerX, centerY, width, height, angularExtent, wavelength, papillaHeight) {
@@ -578,14 +584,23 @@ const Geometry = (function() {
         // Estimate arc length for requested angular extent (approximate)
         const requestedArcLength = (angularExtent / 360) * circumference;
 
-        // Calculate minimum ridge count to satisfy requested extent
-        const minRidgeCount = Math.ceil(requestedArcLength / wavelength);
+        // Find the minimum number of half-waves (each of length wavelength/2) whose total
+        // length reaches at least the requested arc length.
+        const halfWavelength = wavelength / 2;
+        const minHalfWaveCount = Math.ceil(requestedArcLength / halfWavelength);
 
-        // Round up to nearest odd number (so papilla peak is at palmar center)
-        const ridgeCount = (minRidgeCount % 2 === 0) ? minRidgeCount + 1 : minRidgeCount;
+        // Force an odd half-wave count: this guarantees a positive peak at the palmar center
+        // (phase = 0) and a zero-crossing at both ends of the applied region (phase = ±nπ/2 with
+        // n odd), so the waveform connects smoothly to the base ellipse.
+        const halfWaveCount = (minHalfWaveCount % 2 === 0) ? minHalfWaveCount + 1 : Math.max(1, minHalfWaveCount);
 
-        // Actual arc length with integer periods
-        const actualArcLength = ridgeCount * wavelength;
+        // Actual arc length spanned by the applied region (may be slightly larger than requested
+        // so that it ends exactly on a zero-crossing)
+        const actualArcLength = halfWaveCount * wavelength / 2;
+
+        // Retain "ridgeCount" as the metadata field name for compatibility with existing
+        // consumers (exporter, etc.); it now holds the (odd) half-wave count.
+        const ridgeCount = halfWaveCount;
 
         // Calculate actual angular extent (approximate, using linear relation)
         const actualAngularExtent = (actualArcLength / circumference) * 360;
@@ -598,6 +613,7 @@ const Geometry = (function() {
         // If papillaHeight is effectively 0, return a standard ellipse boundary.
         // Full layout metadata (palmarStart, palmarEnd) is included so the exporter
         // can use the same segmented-boundary topology regardless of papilla amplitude.
+
         if (papillaHeight <= EPS) {
             return {
                 boundary: createEllipseBoundary('epidermis-inner', 'epidermis-inner', centerX, centerY, width, height),
@@ -649,21 +665,30 @@ const Geometry = (function() {
             const nxNorm = nx / nMag;
             const nyNorm = ny / nMag;
 
-            // Check if this point is in the papillae region
-            let inPapillaRegion = false;
-            if (palmarStart < palmarEnd) {
-                inPapillaRegion = (theta >= palmarStart && theta <= palmarEnd);
-            } else {
-                inPapillaRegion = (theta >= palmarStart || theta <= palmarEnd);
-            }
+            // Check if this point is within the applied papillae region, using the signed
+            // arc length from the palmar center (s_relative) rather than the angle theta,
+            // per requirement 9. The applied region spans [-actualArcLength/2, +actualArcLength/2].
+            const halfActualArcLength = actualArcLength / 2;
+            const inPapillaRegion = (s_relative >= -halfActualArcLength && s_relative <= halfActualArcLength);
 
-            // Displacement: d(s) = h_ed / 2 * (1 + cos(2πs / λ_ed))
-            // Displaced along the outward normal, i.e. dermis protrudes toward epidermis side.
+            // Displacement: signed sine wave around the base ellipse.
+            // d(s) = h_ed / 2 * cos(2π s_relative / λ_ed)
+            // At s_relative = 0 (palmar center): d = +h_ed/2 (positive peak)
+            // At s_relative = ±halfActualArcLength (region ends): d = 0 (zero-crossing, since
+            // the region length is an odd number of half-wavelengths).
+            // Displaced along the outward normal, i.e. dermis protrudes toward epidermis side
+            // for positive displacement, and recedes toward dermis side for negative displacement.
             let displacement = 0;
             if (inPapillaRegion && papillaHeight > 0) {
-                const phase = 2 * Math.PI * s_relative / wavelength;
-                displacement = (papillaHeight / 2) * (1 + Math.cos(phase));
+                // Explicitly zero at the region boundary to avoid floating-point step artifacts.
+                if (Math.abs(Math.abs(s_relative) - halfActualArcLength) < 1e-9) {
+                    displacement = 0;
+                } else {
+                    const phase = 2 * Math.PI * s_relative / wavelength;
+                    displacement = (papillaHeight / 2) * Math.cos(phase);
+                }
             }
+
 
             const x = x0 + displacement * nxNorm;
             const y = y0 + displacement * nyNorm;
