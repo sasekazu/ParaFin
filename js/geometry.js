@@ -34,6 +34,9 @@
 const Geometry = (function() {
     'use strict';
 
+    // Small epsilon for floating-point comparisons (e.g. ridgeHeight === 0)
+    const EPS = 1e-10;
+
     // Default parameter values (based on Serhat et al. 2022, Fig. 5B)
     const DEFAULT_PARAMS = {
         fingerWidth: 20,
@@ -372,47 +375,53 @@ const Geometry = (function() {
     function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHeight, stratumCorneumThickness, angularExtent, wavelength, ridgeHeight) {
         const rx_outer = outerWidth / 2;
         const ry_outer = outerHeight / 2;
-        
-        // If ridgeHeight is 0, return standard ellipse boundaries
-        if (ridgeHeight === 0) {
-            return {
-                outerBoundary: createEllipseBoundary('finger-outer', 'outer-boundary', centerX, centerY, outerWidth, outerHeight),
-                innerBoundary: createEllipseBoundary('stratum-corneum-inner', 'stratum-corneum-inner', centerX, centerY, 
-                    outerWidth - 2 * stratumCorneumThickness, outerHeight - 2 * stratumCorneumThickness),
-                metadata: {
-                    requestedAngularExtent: angularExtent,
-                    actualAngularExtent: 0,
-                    ridgeCount: 0
-                }
-            };
-        }
-        
-        // Calculate circumference using Ramanujan's approximation
+
+        // Calculate circumference using Ramanujan's approximation.
+        // Computed unconditionally so palmar layout metadata is always available.
         const a = Math.max(rx_outer, ry_outer);
         const b = Math.min(rx_outer, ry_outer);
         const h = Math.pow((a - b) / (a + b), 2);
         const circumference = Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
-        
+
         // Estimate arc length for requested angular extent (approximate)
         const requestedArcLength = (angularExtent / 360) * circumference;
-        
+
         // Calculate minimum ridge count to satisfy requested extent
         const minRidgeCount = Math.ceil(requestedArcLength / wavelength);
-        
+
         // Round up to nearest odd number (so ridge peak is at palmar center)
         const ridgeCount = (minRidgeCount % 2 === 0) ? minRidgeCount + 1 : minRidgeCount;
-        
+
         // Actual arc length with integer periods
         const actualArcLength = ridgeCount * wavelength;
-        
+
         // Calculate actual angular extent (approximate, using linear relation)
         const actualAngularExtent = (actualArcLength / circumference) * 360;
-        
+
         // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
         const palmarCenter = 270; // degrees
         const palmarStart = palmarCenter - actualAngularExtent / 2;
         const palmarEnd = palmarCenter + actualAngularExtent / 2;
-        
+
+        // If ridgeHeight is effectively 0, return standard ellipse boundaries.
+        // Full layout metadata (palmarStart, palmarEnd) is included so the exporter
+        // can use the same segmented-boundary topology regardless of ridge amplitude.
+        if (ridgeHeight <= EPS) {
+            return {
+                outerBoundary: createEllipseBoundary('finger-outer', 'outer-boundary', centerX, centerY, outerWidth, outerHeight),
+                innerBoundary: createEllipseBoundary('stratum-corneum-inner', 'stratum-corneum-inner', centerX, centerY,
+                    outerWidth - 2 * stratumCorneumThickness, outerHeight - 2 * stratumCorneumThickness),
+                metadata: {
+                    requestedAngularExtent: angularExtent,
+                    actualAngularExtent: actualAngularExtent,
+                    ridgeCount: ridgeCount,
+                    palmarCenter: palmarCenter,
+                    palmarStart: palmarStart,
+                    palmarEnd: palmarEnd
+                }
+            };
+        }
+
         // Calculate arc length at palmar center (reference point for phase = 0)
         const palmarCenterRad = palmarCenter * Math.PI / 180;
         const palmarCenterArcLength = (palmarCenter / 360) * circumference;
