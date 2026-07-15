@@ -2,131 +2,197 @@
 
 **Parametric Fingertip Geometry Generator for FEA**
 
-Web-based tool for generating 2D fingertip cross-section geometries with parametric control. Export to JSON for finite element analysis.
+ParaFin is a browser-based tool for generating and previewing parametric 2D fingertip cross-section models. Project settings can be saved to JSON, and Gmsh-compatible `.geo` files can be exported for finite element meshing.
 
----
+## Features
+
+- Parametric fingertip, tissue-layer, bone, and nail geometry
+- Fingerprint ridges on the palmar surface
+- Dermal papillae at the epidermis–dermis interface
+- Full and magnified SVG previews
+- Project save/load using JSON
+- Gmsh `.geo` export with physical groups
+- Embedded uniform or locally refined mesh-size settings
+- No installation, build process, or web server required
 
 ## Quick Start
 
-Open `index.html` in a web browser. No installation or server required.
-
-```bash
-open index.html
-```
-
----
-
-## Reference
-
-Parameter notation follows:
-
-**Serhat, G., Vardar, Y., and Kuchenbecker, K. J. (2022).**  
-"Contact evolution of dry and hydrated fingertips at initial touch."  
-*PLOS ONE*, 17(7), e0269722. DOI: [10.1371/journal.pone.0269722](https://doi.org/10.1371/journal.pone.0269722)
-
----
+[Click here](https://sasekazu.github.io/ParaFin/) to open the demo site, or open index.html in a modern web browser.
+The application runs entirely in your browser.
 
 ## Parameters
 
-| Symbol | Parameter | JSON Key |
-|--------|-----------|----------|
-| *w*<sub>f</sub> | Finger width [mm] | `fingerWidth` |
-| *h*<sub>f</sub> | Finger height [mm] | `fingerHeight` |
-| *t*<sub>sc</sub> | Stratum corneum thickness [mm] | `stratumCorneumThickness` |
-| *t*<sub>e</sub> | Epidermis thickness [mm] | `epidermisThickness` |
-| *t*<sub>d</sub> | Dermis thickness [mm] | `dermisThickness` |
-| *w*<sub>b</sub> | Bone width [mm] | `boneWidth` |
-| *h*<sub>b</sub> | Bone height [mm] | `boneHeight` |
-| *e*<sub>b</sub> | Bone vertical offset [mm] | `boneOffsetY` |
-| α<sub>n</sub> | Nail angular extent [deg] | `nailAngularExtent` |
+All geometric lengths are specified in millimeters and angles in degrees.
 
-**Notes:**
-- Nail thickness = *t*<sub>sc</sub> + *t*<sub>e</sub> (auto-calculated)
-- Bone horizontal offset fixed at 0 (centered)
-- Subcutaneous tissue fills space between dermis and bone
+### Finger and tissue layers
 
-**Future parameters (not implemented):**
-- α<sub>r</sub>: Fingerprint angular extent
-- λ<sub>r</sub>: Fingerprint wavelength
-- *h*<sub>r</sub>: Fingerprint ridge height
-- λ<sub>ed</sub>: Epidermis-dermis interface wavelength
-- *h*<sub>ed</sub>: Epidermis-dermis interface height
+| Symbol | Parameter | Project JSON key | Default |
+|---|---|---|---:|
+| *w*<sub>f</sub> | Finger width | `geometry.fingerWidth` | 20 mm |
+| *h*<sub>f</sub> | Finger height | `geometry.fingerHeight` | 14 mm |
+| *t*<sub>sc</sub> | Stratum corneum thickness | `geometry.stratumCorneumThickness` | 0.1 mm |
+| *t*<sub>e</sub> | Epidermis thickness | `geometry.epidermisThickness` | 0.6 mm |
+| *t*<sub>d</sub> | Dermis thickness | `geometry.dermisThickness` | 0.8 mm |
 
----
+### Bone and nail
+
+| Symbol | Parameter | Project JSON key | Default |
+|---|---|---|---:|
+| *w*<sub>b</sub> | Bone width | `geometry.boneWidth` | 6 mm |
+| *h*<sub>b</sub> | Bone height | `geometry.boneHeight` | 3 mm |
+| *e*<sub>b</sub> | Bone vertical offset | `geometry.boneOffsetY` | 2 mm |
+| α<sub>n</sub> | Nail angular extent | `geometry.nailAngularExtent` | 108° |
+
+The bone is horizontally centered. Nail extent is symmetric about the dorsal apex at 90°. Nail thickness is automatically set to *t*<sub>sc</sub> + *t*<sub>e</sub>.
+
+### Fingerprint ridges
+
+| Symbol | Parameter | Project JSON key | Default |
+|---|---|---|---:|
+| α<sub>r</sub> | Requested fingerprint angular extent | `fingerprint.fingerprintAngularExtent` | 140° |
+| λ<sub>r</sub> | Fingerprint wavelength | `fingerprint.fingerprintWavelength` | 0.5 mm |
+| *h*<sub>r</sub> | Fingerprint ridge height | `fingerprint.fingerprintRidgeHeight` | 0.1 mm |
+
+Fingerprint ridges are centered at the palmar apex, 270°. The outer finger boundary and stratum-corneum inner boundary use phase-matched displacements so that the stratum corneum thickness remains aligned along the local normal direction.
+
+The ridge count is rounded up to an odd integer number of wavelengths. Consequently, the actual angular extent can be slightly larger than the requested value. Set *h*<sub>r</sub> to `0` for smooth boundaries.
+
+### Dermal papillae
+
+| Symbol | Parameter | Project JSON key | Default |
+|---|---|---|---:|
+| α<sub>ed</sub> | Requested dermal-papillae angular extent | `dermalPapillae.epidermisDermisAngularExtent` | 140° |
+| λ<sub>ed</sub> | Dermal-papillae wavelength | `dermalPapillae.epidermisDermisWavelength` | 1.0 mm |
+| *h*<sub>ed</sub> | Dermal-papillae height | `dermalPapillae.epidermisDermisHeight` | 0.2 mm |
+
+Dermal papillae are applied independently of the fingerprint settings and are centered at 270° on the epidermis–dermis interface. Their count is also rounded up to an odd integer number of wavelengths, so the actual angular extent can exceed the requested value slightly.
+
+Set *h*<sub>ed</sub> to `0` for a smooth interface. A nonzero value must be smaller than the epidermis thickness.
+
+### Mesh settings
+
+| Parameter | Project JSON key | Default |
+|---|---|---:|
+| Fine mesh size | `mesh.fineSize` | 0.05 mm |
+| Bulk mesh size | `mesh.bulkSize` | 0.30 mm |
+| Fine-region distance | `mesh.fineDistance` | 0.10 mm |
+| Transition distance | `mesh.transitionDistance` | 0.60 mm |
+| Distance sampling | `mesh.distanceSampling` | 200 |
+
+The fine mesh size must not exceed the bulk mesh size. The transition distance must be greater than the fine-region distance, and distance sampling must be an integer of at least 10.
 
 ## Coordinate System
 
-- **Origin**: Finger center
-- **X-axis**: Left (-) to right (+)
-- **Y-axis**: Palmar (-) to dorsal (+)
-- **Units**: millimeters (mm), degrees (°)
-- **Angles**: 0° = +X, 90° = +Y (dorsal), counterclockwise
+- **Origin:** center of the outer finger ellipse
+- **X-axis:** left (−) to right (+)
+- **Y-axis:** palmar (−) to dorsal (+)
+- **Angle convention:** 0° at +X, 90° at the dorsal apex, and 270° at the palmar apex
+- **Direction:** counterclockwise
+- **Units:** millimeters and degrees
 
----
+## Project JSON
 
-## JSON Export
+`Download JSON` saves only user-configurable settings. It does not store generated boundary coordinates, derived geometry, Gmsh entity IDs, or mesh data.
 
-Exports geometry with:
-- Input parameters
-- Boundary definitions (ellipses and arcs)
-- Region definitions (tissue layers)
-- Coordinate system metadata
+The current format is:
 
-Use for mesh generation in Gmsh, FEniCS, or custom tools.
+```json
+{
+  "format": "parafin-project",
+  "formatVersion": 1,
+  "units": "mm",
+  "geometry": {},
+  "fingerprint": {},
+  "dermalPapillae": {},
+  "mesh": {}
+}
+```
 
----
+`Load Project` validates the file before applying it. Missing optional fingerprint, dermal-papillae, or mesh fields are replaced with application defaults. Only millimeter-based format-version-1 projects are currently supported. Legacy JSON files containing exported boundary data are not supported.
 
-## GEO Export
+## Gmsh GEO Export
 
-Exports **geometry-only** `.geo` files for [Gmsh](https://gmsh.info/):
-- 6 tissue layers: stratum corneum, epidermis, dermis, subcutaneous, bone, nail
-- Ellipse arcs split at nail boundaries (no Boolean operations)
-- Shared curve IDs between adjacent tissues (no duplicate boundaries)
-- Physical Surface and Physical Curve definitions
+`Download GEO` generates `parafin-model.geo` containing:
 
-**Mesh settings are NOT included in the GEO file.** Configure mesh resolution (element size, refinement, etc.) in Gmsh GUI or via command-line options:
+- OpenCASCADE geometry
+- Ellipse arcs for smooth boundary portions
+- BSpline curves for active fingerprint and dermal-papillae regions
+- Shared curves between adjacent tissue surfaces
+- Six physical tissue surfaces
+- Physical boundary curves
+- Mesh-size control parameters
+
+### Physical surfaces
+
+| ID | Name |
+|---:|---|
+| 1 | Stratum Corneum |
+| 2 | Epidermis |
+| 3 | Dermis |
+| 4 | Subcutaneous |
+| 5 | Bone |
+| 6 | Nail |
+
+### Physical curves
+
+| ID | Name |
+|---:|---|
+| 1 | Outer Boundary |
+| 2 | Bone Boundary |
+| 3 | Nail Bed |
+
+### Mesh-size control
+
+When fingerprint ridges and/or dermal papillae are active, ParaFin writes Gmsh `Distance` and `Threshold` fields that refine the mesh around the corresponding BSpline curves. The element size transitions from `fineSize` near those curves to `bulkSize` farther away.
+
+When both wave heights are zero, the exported GEO uses a uniform `bulkSize` instead. The generated file sets:
+
+```geo
+Mesh.Algorithm = 6;
+```
+
+Generate a 2D mesh from the command line with:
 
 ```bash
-gmsh parafin-model.geo -2 -clmin 0.02 -clmax 0.5
+gmsh parafin-model.geo -2
 ```
 
-This design philosophy keeps geometry definition separate from mesh generation, allowing flexible mesh experimentation without regenerating the geometry.
+Mesh settings can also be edited directly in the generated GEO file before meshing.
 
----
+## Geometric Model and Approximations
 
-## Approximations
+The model contains six regions:
 
-⚠️ **Tissue layer boundaries use simplified ellipse scaling**, not true normal offset:
-```
-innerWidth = outerWidth - 2 × thickness
+1. Stratum corneum
+2. Epidermis
+3. Dermis
+4. Subcutaneous tissue
+5. Bone
+6. Nail
+
+Smooth tissue-layer boundaries use simplified ellipse scaling rather than a true normal offset:
+
+```text
+innerWidth  = outerWidth  - 2 × thickness
 innerHeight = outerHeight - 2 × thickness
 ```
 
-This approximation is reasonable for nearly circular ellipses but less accurate for eccentric shapes.
+This approximation is most appropriate for nearly circular ellipses and becomes less accurate as ellipse eccentricity increases.
 
-Other simplifications:
-- No fingerprint ridges (smooth surface)
-- No epidermal-dermal interface waviness
-- 2D cross-section only
+Additional limitations:
 
----
+- The model is a two-dimensional cross-section.
+- The bone is represented by an independent ellipse.
+- The nail is represented by an elliptical dorsal region.
+- Fingerprint ridges and dermal papillae use sampled parametric curves rather than anatomically reconstructed surfaces.
+- The exported mesh settings provide one shared refinement scheme rather than tissue-specific element sizes or boundary-layer meshes.
 
-## File Structure
+## Reference
 
-```
-parafin/
-├── index.html         # Main UI
-├── css/style.css      # Styling
-├── js/
-│   ├── geometry.js    # Model generation & validation
-│   ├── renderer.js    # SVG rendering
-│   ├── exporter.js    # JSON export
-│   └── app.js         # UI controller
-└── README.md
-```
+Parameter notation and the basic fingertip cross-section model follow:
 
----
+Serhat, G., Vardar, Y., and Kuchenbecker, K. J. (2022). “Contact evolution of dry and hydrated fingertips at initial touch.” *PLOS ONE*, 17(7), e0269722. https://doi.org/10.1371/journal.pone.0269722
 
 ## License
 
-See [LICENSE](LICENSE) file.
+See the [LICENSE](LICENSE) file.
