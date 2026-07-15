@@ -45,6 +45,13 @@ const Exporter = (function() {
                 fingerprintAngularExtent: params.fingerprintAngularExtent,
                 fingerprintWavelength: params.fingerprintWavelength,
                 fingerprintRidgeHeight: params.fingerprintRidgeHeight
+            },
+            mesh: {
+                fineSize: params.mesh.fineSize,
+                bulkSize: params.mesh.bulkSize,
+                fineDistance: params.mesh.fineDistance,
+                transitionDistance: params.mesh.transitionDistance,
+                distanceSampling: params.mesh.distanceSampling
             }
         };
     }
@@ -76,6 +83,98 @@ const Exporter = (function() {
         // Cleanup
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Generate Gmsh mesh-size control GEO lines.
+     * Returns an array of GEO lines (empty when mesh control is disabled).
+     *
+     * - If fingerprintCurveIds is non-empty: emits Distance + Threshold Fields with
+     *   local refinement near fingerprint BSplines, transitioning smoothly to bulk size.
+     * - If fingerprintCurveIds is empty: emits a uniform bulk-size block (no Fields).
+     * - If meshSettings.enabled is false (or meshSettings is missing): returns [].
+     *
+     * Field IDs are allocated locally via a counter so future additions remain safe.
+     *
+     * @param {Object}   meshSettings       - mesh settings object (from params.mesh)
+     * @param {number[]} fingerprintCurveIds - BSpline Curve IDs for fingerprint regions
+     * @returns {string[]} Array of GEO lines
+     */
+    function generateMeshControlGEO(meshSettings, fingerprintCurveIds) {
+        if (!meshSettings) {
+            return [];
+        }
+
+        const hasCurves = Array.isArray(fingerprintCurveIds) && fingerprintCurveIds.length > 0;
+        const lines = [];
+
+        lines.push('// ------------------------------------------------------------');
+        lines.push(hasCurves
+            ? '// Local mesh-size control near fingerprint-bearing curves'
+            : '// Uniform mesh-size control');
+        lines.push('// Units: mm');
+        lines.push('// ------------------------------------------------------------');
+
+        if (hasCurves) {
+            lines.push(`// Mesh control enabled: true`);
+            lines.push(`// Fine size: ${meshSettings.fineSize} mm`);
+            lines.push(`// Bulk size: ${meshSettings.bulkSize} mm`);
+            lines.push(`// Fine distance: ${meshSettings.fineDistance} mm`);
+            lines.push(`// Transition distance: ${meshSettings.transitionDistance} mm`);
+            lines.push(`// Distance sampling: ${meshSettings.distanceSampling}`);
+            lines.push(`// Fingerprint refinement curves: ${fingerprintCurveIds.join(', ')}`);
+            lines.push('');
+
+            lines.push(`meshFineSize = ${meshSettings.fineSize};`);
+            lines.push(`meshBulkSize = ${meshSettings.bulkSize};`);
+            lines.push(`meshFineDistance = ${meshSettings.fineDistance};`);
+            lines.push(`meshTransitionDistance = ${meshSettings.transitionDistance};`);
+            lines.push('');
+
+            // Field ID allocator (safe for future additions)
+            let nextFieldId = 1;
+            const distanceFieldId = nextFieldId++;
+            const thresholdFieldId = nextFieldId++;
+
+            lines.push(`// Fingerprint curves used for refinement: ${fingerprintCurveIds.join(', ')}`);
+            lines.push(`Field[${distanceFieldId}] = Distance;`);
+            lines.push(`Field[${distanceFieldId}].CurvesList = {${fingerprintCurveIds.join(', ')}};`);
+            lines.push(`Field[${distanceFieldId}].Sampling = ${meshSettings.distanceSampling};`);
+            lines.push('');
+            lines.push(`Field[${thresholdFieldId}] = Threshold;`);
+            lines.push(`Field[${thresholdFieldId}].InField = ${distanceFieldId};`);
+            lines.push(`Field[${thresholdFieldId}].SizeMin = meshFineSize;`);
+            lines.push(`Field[${thresholdFieldId}].SizeMax = meshBulkSize;`);
+            lines.push(`Field[${thresholdFieldId}].DistMin = meshFineDistance;`);
+            lines.push(`Field[${thresholdFieldId}].DistMax = meshTransitionDistance;`);
+            lines.push('');
+            lines.push(`Background Field = ${thresholdFieldId};`);
+            lines.push('');
+            lines.push('Mesh.MeshSizeFromPoints = 0;');
+            lines.push('Mesh.MeshSizeFromCurvature = 0;');
+            lines.push('Mesh.MeshSizeExtendFromBoundary = 0;');
+            lines.push('');
+            lines.push('Mesh.MeshSizeMin = meshFineSize;');
+            lines.push('Mesh.MeshSizeMax = meshBulkSize;');
+            lines.push('');
+            lines.push('Mesh.Algorithm = 6;');
+        } else {
+            lines.push('// No fingerprint curves found; using uniform bulk mesh size.');
+            lines.push(`// Bulk size: ${meshSettings.bulkSize} mm`);
+            lines.push('');
+            lines.push(`meshBulkSize = ${meshSettings.bulkSize};`);
+            lines.push('');
+            lines.push('Mesh.MeshSizeFromPoints = 0;');
+            lines.push('Mesh.MeshSizeFromCurvature = 0;');
+            lines.push('Mesh.MeshSizeExtendFromBoundary = 0;');
+            lines.push('');
+            lines.push('Mesh.MeshSizeMin = meshBulkSize;');
+            lines.push('Mesh.MeshSizeMax = meshBulkSize;');
+            lines.push('');
+            lines.push('Mesh.Algorithm = 6;');
+        }
+
+        return lines;
     }
 
     /**
@@ -625,6 +724,11 @@ const Exporter = (function() {
             geo.push(`Physical Curve("Nail Bed", 3) = {${ep2}, ${ep3}};  // Epidermis inner dorsal arcs (nail bed)`);
             geo.push('');
 
+            // Mesh-size control (fingerprint mode: refine near finger-outer and sc-inner BSplines)
+            const fpCurveIds = [foH.fingerprintCurve, scH.fingerprintCurve];
+            const meshLines = generateMeshControlGEO(params.mesh, fpCurveIds);
+            meshLines.forEach(line => geo.push(line));
+
             return geo.join('\n');
         }
 
@@ -750,6 +854,10 @@ const Exporter = (function() {
         geo.push(`Physical Curve("Outer Boundary", 1) = {${fingerOuterCurves.join(', ')}};`);
         geo.push(`Physical Curve("Bone Boundary", 2) = {${boneCurves.join(', ')}};`);
         geo.push(`Physical Curve("Nail Bed", 3) = {${ep2}, ${ep3}};  // Epidermis inner dorsal arcs (nail bed)`);
+
+        // Mesh-size control (no fingerprint ridges: uniform bulk size)
+        const meshLines = generateMeshControlGEO(params.mesh, []);
+        meshLines.forEach(line => geo.push(line));
 
         return geo.join('\n');
     }
@@ -929,6 +1037,27 @@ const Exporter = (function() {
             fingerprintRidgeHeight:      fp.fingerprintRidgeHeight      !== undefined
                                             ? fp.fingerprintRidgeHeight
                                             : defaults.fingerprintRidgeHeight
+        };
+
+        // Merge optional mesh settings (missing fields fall back to application defaults)
+        const meshDefaults = defaults.mesh;
+        const meshSrc = (typeof data.mesh === 'object' && data.mesh !== null) ? data.mesh : {};
+        merged.mesh = {
+            fineSize:           typeof meshSrc.fineSize === 'number' && isFinite(meshSrc.fineSize)
+                                    ? meshSrc.fineSize
+                                    : meshDefaults.fineSize,
+            bulkSize:           typeof meshSrc.bulkSize === 'number' && isFinite(meshSrc.bulkSize)
+                                    ? meshSrc.bulkSize
+                                    : meshDefaults.bulkSize,
+            fineDistance:       typeof meshSrc.fineDistance === 'number' && isFinite(meshSrc.fineDistance)
+                                    ? meshSrc.fineDistance
+                                    : meshDefaults.fineDistance,
+            transitionDistance: typeof meshSrc.transitionDistance === 'number' && isFinite(meshSrc.transitionDistance)
+                                    ? meshSrc.transitionDistance
+                                    : meshDefaults.transitionDistance,
+            distanceSampling:   typeof meshSrc.distanceSampling === 'number' && Number.isInteger(meshSrc.distanceSampling)
+                                    ? meshSrc.distanceSampling
+                                    : meshDefaults.distanceSampling
         };
 
         validateVersion1Fields(geom, fp);

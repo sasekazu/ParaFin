@@ -47,7 +47,14 @@ const Geometry = (function() {
         nailAngularExtent: 108,  // Symmetric around dorsal apex (90°)
         fingerprintAngularExtent: 140,  // Palmar region extent (minimum)
         fingerprintWavelength: 0.5,     // Ridge wavelength in mm
-        fingerprintRidgeHeight: 0.1     // Ridge height in mm
+        fingerprintRidgeHeight: 0.1,    // Ridge height in mm
+        mesh: {
+            fineSize: 0.05,
+            bulkSize: 0.30,
+            fineDistance: 0.10,
+            transitionDistance: 0.60,
+            distanceSampling: 200
+        }
     };
 
     // Tissue colors for visualization
@@ -76,8 +83,9 @@ const Geometry = (function() {
         const errors = {};
         let isValid = true;
 
-        // Check if all values are numbers
+        // Check if all values are numbers (skip 'mesh' sub-object)
         for (const key in params) {
+            if (key === 'mesh') continue;
             if (typeof params[key] !== 'number' || isNaN(params[key])) {
                 errors[key] = 'Must be a valid number';
                 isValid = false;
@@ -191,6 +199,57 @@ const Geometry = (function() {
         const maxRidgeHeight = 0.2;
         if (params.fingerprintRidgeHeight > maxRidgeHeight) {
             errors.fingerprintRidgeHeight = `Cannot exceed ${maxRidgeHeight.toFixed(1)} mm`;
+            isValid = false;
+        }
+
+        return { valid: isValid, errors };
+    }
+
+    /**
+     * Validate mesh settings and return errors.
+     * Error keys use 'meshFineSize', 'meshBulkSize', etc. to match DOM error element IDs.
+     * When mesh.enabled is false, numeric validation is skipped (settings are inactive).
+     * @param {Object} mesh - Mesh settings object
+     * @returns {Object} { valid, errors }
+     */
+    function validateMeshSettings(mesh) {
+        if (!mesh || typeof mesh !== 'object') {
+            return { valid: false, errors: { meshFineSize: 'Mesh settings missing' } };
+        }
+
+        const errors = {};
+        let isValid = true;
+
+        const fineSizeOk = typeof mesh.fineSize === 'number' && isFinite(mesh.fineSize) && mesh.fineSize > 0;
+        const bulkSizeOk = typeof mesh.bulkSize === 'number' && isFinite(mesh.bulkSize) && mesh.bulkSize > 0;
+        const fineDistanceOk = typeof mesh.fineDistance === 'number' && isFinite(mesh.fineDistance) && mesh.fineDistance >= 0;
+
+        if (!fineSizeOk) {
+            errors.meshFineSize = 'Must be greater than 0';
+            isValid = false;
+        }
+        if (!bulkSizeOk) {
+            errors.meshBulkSize = 'Must be greater than 0';
+            isValid = false;
+        }
+        if (fineSizeOk && bulkSizeOk && mesh.fineSize > mesh.bulkSize) {
+            errors.meshFineSize = 'Fine size must not exceed bulk size';
+            isValid = false;
+        }
+        if (!fineDistanceOk) {
+            errors.meshFineDistance = 'Must be 0 or greater';
+            isValid = false;
+        }
+        if (typeof mesh.transitionDistance !== 'number' || !isFinite(mesh.transitionDistance)) {
+            errors.meshTransitionDistance = 'Must be a valid number';
+            isValid = false;
+        } else if (fineDistanceOk && mesh.transitionDistance <= mesh.fineDistance) {
+            errors.meshTransitionDistance = 'Must be greater than fine-region distance';
+            isValid = false;
+        }
+        if (typeof mesh.distanceSampling !== 'number' || !isFinite(mesh.distanceSampling) ||
+                !Number.isInteger(mesh.distanceSampling) || mesh.distanceSampling < 10) {
+            errors.meshDistanceSampling = 'Must be an integer \u2265 10';
             isValid = false;
         }
 
@@ -606,6 +665,7 @@ const Geometry = (function() {
     return {
         getDefaultParameters,
         validateParameters,
+        validateMeshSettings,
         generateGeometry,
         TISSUE_COLORS
     };
