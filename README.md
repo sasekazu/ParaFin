@@ -81,11 +81,45 @@ Set *h*<sub>ed</sub> to `0` for a smooth interface. A nonzero value must be smal
 
 The fine mesh size must not exceed the bulk mesh size. The transition distance must be greater than the fine-region distance, and distance sampling must be an integer of at least 10.
 
+## Installation from GitHub
+
+ParaFin is not published to the npm registry, but it can be installed directly
+from this GitHub repository (as an ES Module) for use in other Node.js /
+JavaScript projects:
+
+```bash
+npm install github:sasekazu/ParaFin
+```
+
+or, equivalently:
+
+```bash
+npm install https://github.com/sasekazu/ParaFin.git
+```
+
+To pin a specific tagged version instead of tracking the default branch:
+
+```bash
+npm install github:sasekazu/ParaFin#v0.1.0
+```
+
 ## Programmatic API
 
-ParaFin's shape-generation logic is also available as a plain, DOM/UI-independent
-JavaScript API, exposed as `window.ParaFin` (see `js/parafin-api.js`). This lets other
-scripts on the same page generate fingertip geometry without touching the UI.
+ParaFin's shape-generation logic is available as a plain, DOM/UI-independent
+JavaScript API in two equivalent forms:
+
+- **Browser (classic `<script>` tags):** exposed as `window.ParaFin`
+  (see `js/parafin-api.js`, backed by `js/geometry.js`). This is what `index.html` uses,
+  and it also lets other scripts on the same page generate fingertip geometry without
+  touching the UI.
+- **npm / ES Modules:** exposed via `js/parafin-api.esm.js` (backed by
+  `js/geometry-core.js`), for use from other Node.js/JavaScript projects after installing
+  from GitHub as shown above.
+
+Both forms implement the exact same `generate()` behavior on top of the same underlying
+geometry algorithms.
+
+### Browser usage
 
 ```html
 <script src="js/geometry.js"></script>
@@ -100,11 +134,40 @@ scripts on the same page generate fingertip geometry without touching the UI.
 </script>
 ```
 
-`ParaFin.generate(parameters)` merges `parameters` on top of the default parameter set,
-validates the merged result, and generates geometry in one call. Missing keys fall back
-to defaults, so `ParaFin.generate({})` returns the default shape. If the merged
-parameters are invalid, it throws an `Error` describing the problem instead of returning
-a partial shape.
+### npm / ES Modules usage
+
+```js
+import ParaFin from 'parafin';
+
+const result = ParaFin.generate({
+  fingerWidth: 18,
+  fingerHeight: 14
+});
+
+console.log(result.boundaries);
+```
+
+Named imports are also available:
+
+```js
+import {
+  generate,
+  getDefaultParameters,
+  validateParameters,
+  validateMeshSettings,
+  generateGeometry
+} from 'parafin';
+```
+
+### `generate(parameters)` behavior
+
+`generate(parameters)` (i.e. `ParaFin.generate(parameters)` in the browser, or the
+`generate`/default export in npm) merges `parameters` on top of the default parameter
+set (the `mesh` sub-object is merged separately), validates the merged result
+(including mesh settings), and generates geometry in one call. Missing keys fall back
+to defaults, so `generate({})` returns the default shape. If the merged parameters are
+invalid, it throws an `Error` describing the problem instead of returning a partial
+shape.
 
 On success, it returns an object containing at least:
 
@@ -119,8 +182,8 @@ On success, it returns an object containing at least:
 ```
 
 The lower-level building blocks are also exposed directly for convenience:
-`ParaFin.getDefaultParameters()`, `ParaFin.validateParameters(params)`, and
-`ParaFin.generateGeometry(params)` (the latter does not validate its input).
+`getDefaultParameters()`, `validateParameters(params)`, `validateMeshSettings(mesh)`, and
+`generateGeometry(params)` (the latter does not validate its input).
 
 ## Coordinate System
 
