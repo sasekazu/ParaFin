@@ -152,6 +152,40 @@
                 </div>
             </section>
 
+            <!-- Dermal Papillae (Epidermis-Dermis Interface) Section -->
+            <section class="param-section">
+                <h2>Dermal Papillae</h2>
+                <div class="param-group">
+                    <label for="epidermisDermisAngularExtent">
+                        <span class="parameter-name">Dermal papillae angular extent</span><span class="parameter-symbol">, &alpha;<sub>ed</sub></span>
+                        <span class="parameter-unit">[deg]</span>
+                    </label>
+                    <input type="number" id="epidermisDermisAngularExtent" step="1" min="0" max="180" aria-label="Dermal papillae angular extent alpha sub ed in degrees">
+                    <input type="range" id="epidermisDermisAngularExtentSlider" min="0" max="180" step="1" aria-label="Dermal papillae angular extent slider">
+                    <div class="error-message" id="errorEpidermisDermisAngularExtent"></div>
+                    <small style="color: #666; font-size: 0.75rem;">Palmar surface region (centered at 270°), independent of fingerprint</small>
+                </div>
+                <div class="param-group">
+                    <label for="epidermisDermisWavelength">
+                        <span class="parameter-name">Dermal papillae wavelength</span><span class="parameter-symbol">, &lambda;<sub>ed</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="epidermisDermisWavelength" step="0.01" min="0.1" aria-label="Dermal papillae wavelength lambda sub ed in millimeters">
+                    <input type="range" id="epidermisDermisWavelengthSlider" min="0.1" max="5" step="0.01" aria-label="Dermal papillae wavelength slider">
+                    <div class="error-message" id="errorEpidermisDermisWavelength"></div>
+                </div>
+                <div class="param-group">
+                    <label for="epidermisDermisHeight">
+                        <span class="parameter-name">Dermal papillae height</span><span class="parameter-symbol">, h<sub>ed</sub></span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="epidermisDermisHeight" step="0.001" min="0" aria-label="Dermal papillae height h sub ed in millimeters">
+                    <input type="range" id="epidermisDermisHeightSlider" min="0" max="0.6" step="0.001" aria-label="Dermal papillae height slider">
+                    <div class="error-message" id="errorEpidermisDermisHeight"></div>
+                    <small style="color: #666; font-size: 0.75rem;">h<sub>ed</sub> = 0: smooth ellipse (default); must be less than epidermis thickness</small>
+                </div>
+            </section>
+
             <!-- Mesh Settings Section -->
             <section class="param-section collapsible collapsed" id="meshSettingsSection">
                 <h2 class="section-toggle" tabindex="0" role="button" aria-expanded="false" title="Click to expand/collapse">Mesh Settings <span class="toggle-icon" aria-hidden="true"></span></h2>

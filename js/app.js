@@ -25,8 +25,10 @@
         'stratumCorneumThickness', 'epidermisThickness', 'dermisThickness',
         'boneWidth', 'boneHeight', 'boneOffsetY',
         'nailAngularExtent',
-        'fingerprintAngularExtent', 'fingerprintWavelength', 'fingerprintRidgeHeight'
+        'fingerprintAngularExtent', 'fingerprintWavelength', 'fingerprintRidgeHeight',
+        'epidermisDermisAngularExtent', 'epidermisDermisWavelength', 'epidermisDermisHeight'
     ];
+
 
     // Mesh setting parameter names (numeric inputs; checkbox handled separately)
     const MESH_PARAM_NAMES = [

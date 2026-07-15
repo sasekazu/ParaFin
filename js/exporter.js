@@ -139,6 +139,20 @@ const Exporter = (function() {
             geo.push('//   Note: Parametric curves (BSplines) used for finger outer and stratum corneum inner boundaries');
             geo.push('//');
         }
+        if (params.epidermisDermisHeight > 0) {
+            const edMeta = geometry.epidermisDermisMetadata || {};
+            geo.push('//');
+            geo.push('// DERMAL PAPILLAE MODE ACTIVE (epidermis-dermis interface):');
+            geo.push(`//   Papilla height: ${params.epidermisDermisHeight} mm`);
+            geo.push(`//   Wavelength: ${params.epidermisDermisWavelength} mm`);
+            geo.push(`//   Requested angular extent: ${params.epidermisDermisAngularExtent}°`);
+            geo.push(`//   Actual angular extent: ${edMeta.actualAngularExtent?.toFixed(2) || 0}°`);
+            geo.push(`//   Papilla count: ${edMeta.ridgeCount || 0} (odd number, peak at palmar center)`);
+            geo.push('//   Displacement function: d(s) = h_ed/2 * (1 + cos(2πs/λ_ed))');
+            geo.push('//   Note: Parametric curve (BSpline) used for epidermis-inner boundary only');
+            geo.push('//');
+        }
+
         geo.push('');
         geo.push('SetFactory("OpenCASCADE");');
         geo.push('');
@@ -396,9 +410,16 @@ const Exporter = (function() {
         const sc = createSegmentedBoundary(
             scInnerBoundary, fpMeta, true, 'Stratum corneum inner boundary');
 
+        // Epidermis-inner boundary uses its own independent metadata (epidermisDermisMetadata),
+        // since dermal papillae angular extent/wavelength/height are independent of fingerprint
+        // parameters. createSegmentedBoundary() is reused unchanged; it only branches on
+        // boundary.type ('parametric-curve' vs 'ellipse'), which is already set correctly by
+        // Geometry.generateEpidermisDermisBoundary() based on h_ed.
+        const edMeta = geometry.epidermisDermisMetadata || {};
         const ep = createSegmentedBoundary(
             geometry.boundaries.find(b => b.id === 'epidermis-inner'),
-            fpMeta, false, 'Epidermis inner boundary');
+            edMeta, false, 'Epidermis inner boundary');
+
 
         const dermisInnerCurves = createEllipseBoundary(
             geometry.boundaries.find(b => b.id === 'dermis-inner'),
@@ -542,9 +563,11 @@ const Exporter = (function() {
         geo.push(`Physical Curve("Nail Bed", 3) = {${ep.nailCurve1}, ${ep.nailCurve2}};  // Epidermis inner dorsal arcs (nail bed)`);
         geo.push('');
 
-        // Mesh-size control: refine near BSpline palmar curves when fingerprint ridges are active;
-        // fineCurveIds is empty when ridgeHeight=0 (both fo and sc have Ellipse palmarCoreCurve)
-        const fineCurveIds = [...fo.refineCurves, ...sc.refineCurves];
+        // Mesh-size control: refine near BSpline palmar curves when fingerprint ridges and/or
+        // dermal papillae are active; empty entries contribute nothing when the corresponding
+        // boundary has an Ellipse palmarCoreCurve (ridgeHeight=0 / epidermisDermisHeight=0).
+        const fineCurveIds = [...fo.refineCurves, ...sc.refineCurves, ...ep.refineCurves];
+
         const meshLines = generateMeshControlGEO(params.mesh, fineCurveIds);
         meshLines.forEach(line => geo.push(line));
 

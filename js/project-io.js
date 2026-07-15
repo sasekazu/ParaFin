@@ -45,6 +45,11 @@ const _ProjectIO = (function() {
                 fingerprintWavelength: params.fingerprintWavelength,
                 fingerprintRidgeHeight: params.fingerprintRidgeHeight
             },
+            dermalPapillae: {
+                epidermisDermisAngularExtent: params.epidermisDermisAngularExtent,
+                epidermisDermisWavelength: params.epidermisDermisWavelength,
+                epidermisDermisHeight: params.epidermisDermisHeight
+            },
             mesh: {
                 fineSize: params.mesh.fineSize,
                 bulkSize: params.mesh.bulkSize,
@@ -120,8 +125,9 @@ const _ProjectIO = (function() {
      * Throws a descriptive Error on any invalid field.
      * @param {Object} geom - geometry section
      * @param {Object} fp   - fingerprint section
+     * @param {Object} dp   - dermalPapillae section
      */
-    function validateVersion1Fields(geom, fp) {
+    function validateVersion1Fields(geom, fp, dp) {
         function requireFinite(val, name) {
             if (typeof val !== 'number' || !isFinite(val)) {
                 throw new Error('Field "' + name + '" must be a finite number (got ' + val + ').');
@@ -176,6 +182,33 @@ const _ProjectIO = (function() {
         if (fp.fingerprintRidgeHeight !== undefined) {
             requireInRange(fp.fingerprintRidgeHeight, 'fingerprint.fingerprintRidgeHeight', 0, 0.2);
         }
+
+        // Optional dermal papillae (epidermis-dermis interface) fields (only validate if present)
+        if (dp.epidermisDermisAngularExtent !== undefined) {
+            requireInRange(dp.epidermisDermisAngularExtent, 'dermalPapillae.epidermisDermisAngularExtent', 0, 180);
+        }
+        if (dp.epidermisDermisWavelength !== undefined) {
+            requireFinite(dp.epidermisDermisWavelength, 'dermalPapillae.epidermisDermisWavelength');
+            if (dp.epidermisDermisWavelength < 0.1) {
+                throw new Error(
+                    'Field "dermalPapillae.epidermisDermisWavelength" must be >= 0.1 mm ' +
+                    '(got ' + dp.epidermisDermisWavelength + ').'
+                );
+            }
+        }
+        if (dp.epidermisDermisHeight !== undefined) {
+            requireNonNegative(dp.epidermisDermisHeight, 'dermalPapillae.epidermisDermisHeight');
+            const epidermisThickness = geom.epidermisThickness;
+            if (dp.epidermisDermisHeight > 1e-10 &&
+                    typeof epidermisThickness === 'number' &&
+                    dp.epidermisDermisHeight >= epidermisThickness) {
+                throw new Error(
+                    'Field "dermalPapillae.epidermisDermisHeight" must be less than ' +
+                    'geometry.epidermisThickness (got ' + dp.epidermisDermisHeight +
+                    ' >= ' + epidermisThickness + ').'
+                );
+            }
+        }
     }
 
     /**
@@ -191,6 +224,8 @@ const _ProjectIO = (function() {
             ? data.geometry : {};
         const fp = (typeof data.fingerprint === 'object' && data.fingerprint !== null)
             ? data.fingerprint : {};
+        const dp = (typeof data.dermalPapillae === 'object' && data.dermalPapillae !== null)
+            ? data.dermalPapillae : {};
 
         // Require essential geometry keys
         const requiredGeomKeys = [
@@ -204,7 +239,8 @@ const _ProjectIO = (function() {
             }
         }
 
-        // Merge optional fingerprint fields with defaults
+        // Merge optional fingerprint / dermal papillae fields with defaults
+        // (old project files without these sections get default values, per spec)
         const merged = {
             fingerWidth:                 geom.fingerWidth,
             fingerHeight:                geom.fingerHeight,
@@ -223,7 +259,16 @@ const _ProjectIO = (function() {
                                             : defaults.fingerprintWavelength,
             fingerprintRidgeHeight:      fp.fingerprintRidgeHeight      !== undefined
                                             ? fp.fingerprintRidgeHeight
-                                            : defaults.fingerprintRidgeHeight
+                                            : defaults.fingerprintRidgeHeight,
+            epidermisDermisAngularExtent: dp.epidermisDermisAngularExtent !== undefined
+                                            ? dp.epidermisDermisAngularExtent
+                                            : defaults.epidermisDermisAngularExtent,
+            epidermisDermisWavelength:    dp.epidermisDermisWavelength    !== undefined
+                                            ? dp.epidermisDermisWavelength
+                                            : defaults.epidermisDermisWavelength,
+            epidermisDermisHeight:        dp.epidermisDermisHeight        !== undefined
+                                            ? dp.epidermisDermisHeight
+                                            : defaults.epidermisDermisHeight
         };
 
         // Merge optional mesh settings (missing fields fall back to application defaults)
@@ -247,7 +292,7 @@ const _ProjectIO = (function() {
                                     : meshDefaults.distanceSampling
         };
 
-        validateVersion1Fields(geom, fp);
+        validateVersion1Fields(geom, fp, dp);
 
         return merged;
     }
