@@ -450,7 +450,10 @@ const Geometry = (function() {
             metadata: {
                 requestedAngularExtent: angularExtent,
                 actualAngularExtent: actualAngularExtent,
-                ridgeCount: ridgeCount
+                ridgeCount: ridgeCount,
+                palmarCenter: palmarCenter,
+                palmarStart: palmarStart,
+                palmarEnd: palmarEnd
             }
         };
     }
