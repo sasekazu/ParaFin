@@ -321,8 +321,9 @@ const Renderer = (function() {
                     path.setAttribute('stroke-width', 0.5 * (isDetail ? 0.3 : 1));
                     
                     svg.appendChild(path);
-                } else if (innerBoundary && innerBoundary.type === 'ellipse') {
-                    // Ring region with outer parametric curve and inner ellipse (e.g., epidermis with fingerprint)
+                } else if (innerBoundary) {
+                    // Ring region with outer parametric curve and inner ellipse (e.g., epidermis with fingerprint,
+                    // dermal papillae off). Also covers the case of a plain-ellipse inner boundary in general.
                     const outerScreenPoints = outerBoundary.points.map(p => modelToScreen(p.x, p.y, isDetail));
                     
                     const innerCenter = modelToScreen(innerBoundary.center[0], innerBoundary.center[1], isDetail);
@@ -365,7 +366,36 @@ const Renderer = (function() {
             if (region.innerBoundary) {
                 // Ring region (outer - inner)
                 const innerBoundary = boundaryMap[region.innerBoundary];
-                if (innerBoundary) {
+                if (innerBoundary && innerBoundary.type === 'parametric-curve') {
+                    // Ellipse outer + parametric-curve inner (e.g. epidermis region when
+                    // fingerprint is off but dermal papillae is on: stratum-corneum-inner
+                    // is a plain ellipse while epidermis-inner carries displaced points)
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+                    // Outer ellipse: two 180-degree arcs (clockwise)
+                    const outerPath = `
+                        M ${outerCenter.x - outerRx} ${outerCenter.y}
+                        A ${outerRx} ${outerRy} 0 0 0 ${outerCenter.x + outerRx} ${outerCenter.y}
+                        A ${outerRx} ${outerRy} 0 0 0 ${outerCenter.x - outerRx} ${outerCenter.y}
+                        Z
+                    `;
+
+                    // Inner parametric curve (reversed for hole)
+                    const innerScreenPoints = innerBoundary.points.map(p => modelToScreen(p.x, p.y, isDetail));
+                    let innerPath = ` M ${innerScreenPoints[0].x} ${innerScreenPoints[0].y}`;
+                    for (let i = innerScreenPoints.length - 1; i > 0; i--) {
+                        innerPath += ` L ${innerScreenPoints[i].x} ${innerScreenPoints[i].y}`;
+                    }
+                    innerPath += ' Z';
+
+                    path.setAttribute('d', outerPath + ' ' + innerPath);
+                    path.setAttribute('fill', region.color);
+                    path.setAttribute('fill-rule', 'evenodd');
+                    path.setAttribute('stroke', '#333');
+                    path.setAttribute('stroke-width', 0.5 * (isDetail ? 0.3 : 1));
+
+                    svg.appendChild(path);
+                } else if (innerBoundary) {
                     const innerCenter = modelToScreen(innerBoundary.center[0], innerBoundary.center[1], isDetail);
                     const innerRx = innerBoundary.width / 2 * scale;
                     const innerRy = innerBoundary.height / 2 * scale;
