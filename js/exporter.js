@@ -147,8 +147,10 @@ const Exporter = (function() {
             geo.push(`//   Wavelength: ${params.epidermisDermisWavelength} mm`);
             geo.push(`//   Requested angular extent: ${params.epidermisDermisAngularExtent}°`);
             geo.push(`//   Actual angular extent: ${edMeta.actualAngularExtent?.toFixed(2) || 0}°`);
-            geo.push(`//   Papilla count: ${edMeta.ridgeCount || 0} (odd number, peak at palmar center)`);
-            geo.push('//   Displacement function: d(s) = h_ed/2 * (1 + cos(2πs/λ_ed))');
+            geo.push(`//   Papilla half-wave count: ${edMeta.ridgeCount || 0} (odd number, positive peak at palmar center)`);
+            geo.push('//   Displacement function: d(s) = h_ed/2 * cos(2πs_rel/λ_ed)  (h_ed = peak-to-peak height)');
+            geo.push('//   Region ends are zero-crossings (smooth connection to base ellipse)');
+
             geo.push('//   Note: Parametric curve (BSpline) used for epidermis-inner boundary only');
             geo.push('//');
         }
