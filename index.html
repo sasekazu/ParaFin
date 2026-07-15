@@ -152,9 +152,56 @@
                 </div>
             </section>
 
+            <!-- Mesh Settings Section -->
+            <section class="param-section collapsible collapsed" id="meshSettingsSection">
+                <h2 class="section-toggle" tabindex="0" role="button" aria-expanded="false" title="Click to expand/collapse">Mesh Settings <span class="toggle-icon" aria-hidden="true"></span></h2>
+                <div class="section-content">
+                <div class="param-group">
+                    <label for="meshFineSize">
+                        <span class="parameter-name">Fine mesh size</span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="meshFineSize" step="0.005" min="0.001" aria-label="Fine mesh size in millimeters">
+                    <div class="error-message" id="errorMeshFineSize"></div>
+                </div>
+                <div class="param-group">
+                    <label for="meshBulkSize">
+                        <span class="parameter-name">Bulk mesh size</span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="meshBulkSize" step="0.01" min="0.001" aria-label="Bulk mesh size in millimeters">
+                    <div class="error-message" id="errorMeshBulkSize"></div>
+                </div>
+                <div class="param-group">
+                    <label for="meshFineDistance">
+                        <span class="parameter-name">Fine-region distance</span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="meshFineDistance" step="0.01" min="0" aria-label="Fine-region distance in millimeters">
+                    <div class="error-message" id="errorMeshFineDistance"></div>
+                </div>
+                <div class="param-group">
+                    <label for="meshTransitionDistance">
+                        <span class="parameter-name">Transition distance</span>
+                        <span class="parameter-unit">[mm]</span>
+                    </label>
+                    <input type="number" id="meshTransitionDistance" step="0.01" min="0" aria-label="Transition distance in millimeters">
+                    <div class="error-message" id="errorMeshTransitionDistance"></div>
+                </div>
+                <div class="param-group">
+                    <label for="meshDistanceSampling">
+                        <span class="parameter-name">Distance sampling</span>
+                    </label>
+                    <input type="number" id="meshDistanceSampling" step="1" min="10" aria-label="Distance sampling count">
+                    <div class="error-message" id="errorMeshDistanceSampling"></div>
+                </div>
+                </div>
+            </section>
+
             <!-- Action Buttons -->
             <div class="actions">
                 <button id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
+                <button id="loadProjectButton" class="btn btn-secondary">Load Project</button>
                 <button id="downloadButton" class="btn btn-primary">Download JSON</button>
                 <button id="downloadGeoButton" class="btn btn-primary">Download GEO</button>
             </div>

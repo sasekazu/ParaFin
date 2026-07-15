@@ -28,6 +28,11 @@
         'fingerprintAngularExtent', 'fingerprintWavelength', 'fingerprintRidgeHeight'
     ];
 
+    // Mesh setting parameter names (numeric inputs; checkbox handled separately)
+    const MESH_PARAM_NAMES = [
+        'meshFineSize', 'meshBulkSize', 'meshFineDistance', 'meshTransitionDistance', 'meshDistanceSampling'
+    ];
+
     /**
      * Initialize DOM element references
      */
@@ -40,9 +45,17 @@
                 document.getElementById('error' + param.charAt(0).toUpperCase() + param.slice(1));
         });
 
+        // Mesh settings elements
+        MESH_PARAM_NAMES.forEach(name => {
+            elements[name] = document.getElementById(name);
+            elements['error' + name.charAt(0).toUpperCase() + name.slice(1)] =
+                document.getElementById('error' + name.charAt(0).toUpperCase() + name.slice(1));
+        });
+
         // Other elements
         elements.errorSummary = document.getElementById('errorSummary');
         elements.resetButton = document.getElementById('resetButton');
+        elements.loadProjectButton = document.getElementById('loadProjectButton');
         elements.downloadButton = document.getElementById('downloadButton');
         elements.downloadGeoButton = document.getElementById('downloadGeoButton');
         elements.legend = document.getElementById('legend');
@@ -58,7 +71,22 @@
             const value = parseFloat(elements[param].value);
             params[param] = isNaN(value) ? 0 : value;
         });
+        params.mesh = getMeshSettings();
         return params;
+    }
+
+    /**
+     * Get current mesh settings from input fields
+     * @returns {Object} Current mesh settings
+     */
+    function getMeshSettings() {
+        return {
+            fineSize: parseFloat(elements.meshFineSize.value),
+            bulkSize: parseFloat(elements.meshBulkSize.value),
+            fineDistance: parseFloat(elements.meshFineDistance.value),
+            transitionDistance: parseFloat(elements.meshTransitionDistance.value),
+            distanceSampling: parseInt(elements.meshDistanceSampling.value, 10)
+        };
     }
 
     /**
@@ -72,6 +100,14 @@
                 elements[param + 'Slider'].value = params[param];
             }
         });
+        if (params.mesh) {
+            const m = params.mesh;
+            if (m.fineSize !== undefined)           elements.meshFineSize.value = m.fineSize;
+            if (m.bulkSize !== undefined)           elements.meshBulkSize.value = m.bulkSize;
+            if (m.fineDistance !== undefined)       elements.meshFineDistance.value = m.fineDistance;
+            if (m.transitionDistance !== undefined) elements.meshTransitionDistance.value = m.transitionDistance;
+            if (m.distanceSampling !== undefined)   elements.meshDistanceSampling.value = m.distanceSampling;
+        }
         currentParams = { ...params };
     }
 
@@ -84,6 +120,14 @@
         
         PARAM_DEFINITIONS.forEach(param => {
             const errorElement = elements['error' + param.charAt(0).toUpperCase() + param.slice(1)];
+            if (errorElement) {
+                errorElement.textContent = '';
+                errorElement.style.display = 'none';
+            }
+        });
+
+        MESH_PARAM_NAMES.forEach(name => {
+            const errorElement = elements['error' + name.charAt(0).toUpperCase() + name.slice(1)];
             if (errorElement) {
                 errorElement.textContent = '';
                 errorElement.style.display = 'none';
@@ -127,8 +171,13 @@
 
         // Validate parameters
         const validation = Geometry.validateParameters(currentParams);
+        const meshValidation = Geometry.validateMeshSettings(currentParams.mesh);
 
-        if (validation.valid) {
+        // Merge all errors
+        const allErrors = { ...validation.errors, ...meshValidation.errors };
+        const allValid = validation.valid && meshValidation.valid;
+
+        if (allValid) {
             clearErrors();
             elements.downloadButton.disabled = false;
             elements.downloadGeoButton.disabled = false;
@@ -140,7 +189,7 @@
             Renderer.render(geometry, currentParams);
             Renderer.updateLegend(geometry, elements.legend);
         } else {
-            displayErrors(validation.errors);
+            displayErrors(allErrors);
 
             // Still try to render if possible (with best effort)
             try {
@@ -157,6 +206,22 @@
      * Setup event listeners for input synchronization
      */
     function setupEventListeners() {
+        // Collapsible section toggles
+        document.querySelectorAll('.param-section.collapsible .section-toggle').forEach(function(toggle) {
+            function doToggle() {
+                const section = toggle.parentElement;
+                const isCollapsed = section.classList.toggle('collapsed');
+                toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+            }
+            toggle.addEventListener('click', doToggle);
+            toggle.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    doToggle();
+                }
+            });
+        });
+
         PARAM_DEFINITIONS.forEach(param => {
             const input = elements[param];
             const slider = elements[param + 'Slider'];
@@ -184,6 +249,31 @@
             updateGeometry();
         });
 
+        // Load Project button
+        elements.loadProjectButton.addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.addEventListener('load', function() {
+                    try {
+                        const importedParams = Exporter.importProjectFromText(reader.result);
+                        setParameters(importedParams);
+                        updateGeometry();
+                    } catch (err) {
+                        clearErrors();
+                        elements.errorSummary.textContent = 'Failed to load project: ' + err.message;
+                        elements.errorSummary.style.display = 'block';
+                    }
+                });
+                reader.readAsText(file);
+            });
+            fileInput.click();
+        });
+
         // Download JSON button
         elements.downloadButton.addEventListener('click', function() {
             if (this.disabled) return;
@@ -192,8 +282,7 @@
             const validation = Geometry.validateParameters(params);
 
             if (validation.valid) {
-                const geometry = Geometry.generateGeometry(params);
-                Exporter.downloadJSON(params, geometry);
+                Exporter.downloadJSON(params);
             }
         });
 
@@ -208,6 +297,11 @@
                 const geometry = Geometry.generateGeometry(params);
                 Exporter.downloadGEO(params, geometry);
             }
+        });
+
+        // Mesh settings inputs
+        MESH_PARAM_NAMES.forEach(name => {
+            elements[name].addEventListener('input', updateGeometry);
         });
 
         // Window resize
@@ -237,8 +331,11 @@
         // Setup event listeners
         setupEventListeners();
 
-        // Initial render
-        updateGeometry();
+        // Initial render — deferred so the browser completes layout first
+        // (container.clientWidth/Height are 0 during synchronous DOMContentLoaded)
+        requestAnimationFrame(function() {
+            updateGeometry();
+        });
     }
 
     // Initialize when DOM is ready

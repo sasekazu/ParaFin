@@ -539,50 +539,26 @@ const Renderer = (function() {
         // Draw axes in main view
         drawAxes(params, false);
 
-        // Render detail view (only if fingerprint exists with ridges)
-        // Check if finger-outer boundary is parametric-curve (means fingerprint with ridges exists)
-        const fingerOuterBoundary = boundaryMap['finger-outer'];
-        const hasFingerprintRidges = fingerOuterBoundary && fingerOuterBoundary.type === 'parametric-curve';
+        // Render detail view
+        clear(true);
+        calculateTransform(geometry, params, true);
 
-        if (hasFingerprintRidges) {
-            clear(true);
-            calculateTransform(geometry, params, true);
+        // Draw fingerprint-related regions in detail view
+        // Include all tissue layers to show complete structure
+        const fingerprintRegions = geometry.regions.filter(r => 
+            r.id === 'subcutaneous-region' ||
+            r.id === 'bone-region' ||
+            r.id === 'dermis-region' ||
+            r.id === 'epidermis-region' ||
+            r.id === 'stratum-corneum-region'
+        );
 
-            // Draw fingerprint-related regions in detail view
-            // Include all tissue layers to show complete structure
-            const fingerprintRegions = geometry.regions.filter(r => 
-                r.id === 'subcutaneous-region' ||
-                r.id === 'bone-region' ||
-                r.id === 'dermis-region' ||
-                r.id === 'epidermis-region' ||
-                r.id === 'stratum-corneum-region'
-            );
+        fingerprintRegions.forEach(region => {
+            drawRegion(region, boundaryMap, true);
+        });
 
-            fingerprintRegions.forEach(region => {
-                drawRegion(region, boundaryMap, true);
-            });
-
-            // Draw axes in detail view
-            drawAxes(params, true);
-        } else {
-            // If no fingerprint ridges, show a message in detail view
-            clear(true);
-            calculateTransform(geometry, params, true);
-            
-            const svg = detailSvg;
-            const textGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            
-            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', detailViewBoxWidth / 2);
-            text.setAttribute('y', detailViewBoxHeight / 2);
-            text.setAttribute('fill', '#999');
-            text.setAttribute('font-size', '14');
-            text.setAttribute('text-anchor', 'middle');
-            text.textContent = 'Set Ridge Height > 0 to see fingerprint detail';
-            
-            textGroup.appendChild(text);
-            svg.appendChild(textGroup);
-        }
+        // Draw axes in detail view
+        drawAxes(params, true);
     }
 
     /**

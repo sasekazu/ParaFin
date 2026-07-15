@@ -135,6 +135,45 @@ header .subtitle {
     margin-bottom: 1rem;
 }
 
+/* Collapsible sections */
+.param-section.collapsible h2.section-toggle {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 0;
+}
+
+.param-section.collapsible h2.section-toggle:hover {
+    color: #1a252f;
+}
+
+.param-section.collapsible h2.section-toggle:focus {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.toggle-icon::before {
+    content: '\25BC';
+    font-size: 0.65rem;
+    color: #888;
+    transition: transform 0.2s;
+}
+
+.param-section.collapsible.collapsed .toggle-icon::before {
+    content: '\25B6';
+}
+
+.param-section.collapsible .section-content {
+    margin-top: 1rem;
+}
+
+.param-section.collapsible.collapsed .section-content {
+    display: none;
+}
+
 /* Parameter groups */
 .param-group {
     margin-bottom: 1rem;
