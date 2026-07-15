@@ -1,36 +1,36 @@
 /**
- * exporter.js - JSON export functionality for ParaFin
- * 
+ * exporter.js - JSON import/export functionality for ParaFin
+ *
  * This module handles:
- * - Converting geometry model to JSON format
- * - Creating downloadable JSON file
- * - Managing export metadata
+ * - Saving the current input settings as a minimal project JSON file
+ * - Loading a project JSON file and restoring application settings
+ * - Generating Gmsh GEO format for mesh generation
  */
 
 const Exporter = (function() {
     'use strict';
 
     const APP_VERSION = '0.1.0';
+    const PROJECT_FORMAT = 'parafin-project';
+    const SUPPORTED_VERSIONS = [1];
+
+    // ---------------------------------------------------------------------------
+    // Export
+    // ---------------------------------------------------------------------------
 
     /**
-     * Generate complete JSON export object
+     * Build the project data object from current parameters.
+     * Only user-configurable input values are included; no derived data,
+     * boundary coordinates, or Gmsh IDs.
      * @param {Object} params - Parameter object
-     * @param {Object} geometry - Geometry model
-     * @returns {Object} JSON export object
+     * @returns {Object} Project data object
      */
-    function generateJSON(params, geometry) {
+    function generateJSON(params) {
         return {
-            application: 'ParaFin',
-            version: APP_VERSION,
-            unit: 'mm',
-            coordinateSystem: {
-                origin: 'finger-center',
-                xAxis: 'left-right',
-                yAxis: 'dorsal-palmar',
-                dorsalDirection: 'positive-y',
-                description: 'Right-handed coordinate system with origin at finger center'
-            },
-            parameters: {
+            format: PROJECT_FORMAT,
+            formatVersion: 1,
+            units: 'mm',
+            geometry: {
                 fingerWidth: params.fingerWidth,
                 fingerHeight: params.fingerHeight,
                 stratumCorneumThickness: params.stratumCorneumThickness,
@@ -39,53 +39,23 @@ const Exporter = (function() {
                 boneWidth: params.boneWidth,
                 boneHeight: params.boneHeight,
                 boneOffsetY: params.boneOffsetY,
-                nailAngularExtent: params.nailAngularExtent,
+                nailAngularExtent: params.nailAngularExtent
+            },
+            fingerprint: {
                 fingerprintAngularExtent: params.fingerprintAngularExtent,
                 fingerprintWavelength: params.fingerprintWavelength,
                 fingerprintRidgeHeight: params.fingerprintRidgeHeight
-            },
-            derivedValues: {
-                boneOffsetX: 0,
-                nailThickness: params.stratumCorneumThickness + params.epidermisThickness,
-                nailStartAngle: 90 - params.nailAngularExtent / 2,
-                nailEndAngle: 90 + params.nailAngularExtent / 2,
-                fingerprintMode: params.fingerprintRidgeHeight > 0 ? 'enabled' : 'disabled',
-                fingerprint: geometry.fingerprintMetadata || {
-                    requestedAngularExtent: params.fingerprintAngularExtent,
-                    actualAngularExtent: 0,
-                    ridgeCount: 0
-                }
-            },
-            geometry: {
-                boundaries: geometry.boundaries,
-                regions: geometry.regions
-            },
-            notes: {
-                approximation: 'Tissue layer boundaries use simplified ellipse scaling (width/height reduction) rather than true normal offset',
-                assumptions: params.fingerprintRidgeHeight === 0 
-                    ? 'No fingerprint ridges, smooth epidermal surface'
-                    : 'Fingerprint ridges applied to palmar surface with integer periods, smooth transitions at boundaries',
-                nailModel: 'Nail thickness equals stratum corneum + epidermis (nail replaces these layers). Nail arc is symmetric around dorsal apex (90°).',
-                fingerprintModel: params.fingerprintRidgeHeight === 0
-                    ? 'Fingerprint ridge height = 0: smooth elliptical surface (same as legacy behavior)'
-                    : `Fingerprint ridges with integer periods (odd count, ridge peak at palmar center). Displacement: d(s) = h_r/2 * (1 + cos(2πs/λ_r)). Requested extent: ${params.fingerprintAngularExtent}°, actual extent: ${geometry.fingerprintMetadata?.actualAngularExtent?.toFixed(2) || 0}°, ridge count: ${geometry.fingerprintMetadata?.ridgeCount || 0}. Wavelength: ${params.fingerprintWavelength} mm, height: ${params.fingerprintRidgeHeight} mm.`
-            },
-            extensionReserved: {
-                epidermalRidges: null,
-                receptors: null,
-                meshSize: null
             }
         };
     }
 
     /**
-     * Download JSON as file
+     * Download the project as a JSON file.
      * @param {Object} params - Parameter object
-     * @param {Object} geometry - Geometry model
      * @param {string} filename - Output filename
      */
-    function downloadJSON(params, geometry, filename = 'parafin-model.json') {
-        const jsonData = generateJSON(params, geometry);
+    function downloadJSON(params, filename = 'parafin-project.json') {
+        const jsonData = generateJSON(params);
         const jsonString = JSON.stringify(jsonData, null, 2);
         
         // Create blob
@@ -813,11 +783,204 @@ const Exporter = (function() {
         URL.revokeObjectURL(url);
     }
 
+    // ---------------------------------------------------------------------------
+    // Import
+    // ---------------------------------------------------------------------------
+
+    /**
+     * Parse raw JSON text into a plain object.
+     * Detects the old boundary-dump format and surfaces a clear message.
+     * @param {string} text - Raw JSON text
+     * @returns {Object} Parsed object
+     * @throws {Error}
+     */
+    function parseProjectJSON(text) {
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            throw new Error('The file does not contain valid JSON.');
+        }
+
+        // Detect legacy format (old boundary-dump export)
+        if (data.application === 'ParaFin' && data.geometry && data.geometry.boundaries) {
+            throw new Error(
+                'This JSON file uses an unsupported legacy ParaFin format. ' +
+                'Please re-export the model using the current version.'
+            );
+        }
+
+        if (data.format !== PROJECT_FORMAT) {
+            throw new Error(
+                'Invalid file: not a ParaFin project file ' +
+                '(expected format "' + PROJECT_FORMAT + '").'
+            );
+        }
+
+        return data;
+    }
+
+    /**
+     * Validate a parsed v1 project data object.
+     * Throws a descriptive Error on any invalid field.
+     * @param {Object} geom - geometry section
+     * @param {Object} fp   - fingerprint section
+     */
+    function validateVersion1Fields(geom, fp) {
+        function requireFinite(val, name) {
+            if (typeof val !== 'number' || !isFinite(val)) {
+                throw new Error('Field "' + name + '" must be a finite number (got ' + val + ').');
+            }
+        }
+        function requirePositive(val, name) {
+            requireFinite(val, name);
+            if (val <= 0) {
+                throw new Error('Field "' + name + '" must be greater than 0 (got ' + val + ').');
+            }
+        }
+        function requireNonNegative(val, name) {
+            requireFinite(val, name);
+            if (val < 0) {
+                throw new Error('Field "' + name + '" must be >= 0 (got ' + val + ').');
+            }
+        }
+        function requireInRange(val, name, min, max) {
+            requireFinite(val, name);
+            if (val < min || val > max) {
+                throw new Error(
+                    'Field "' + name + '" must be between ' + min + ' and ' + max +
+                    ' (got ' + val + ').'
+                );
+            }
+        }
+
+        // Required geometry fields
+        requirePositive(geom.fingerWidth, 'geometry.fingerWidth');
+        requirePositive(geom.fingerHeight, 'geometry.fingerHeight');
+        requireNonNegative(geom.stratumCorneumThickness, 'geometry.stratumCorneumThickness');
+        requireNonNegative(geom.epidermisThickness, 'geometry.epidermisThickness');
+        requireNonNegative(geom.dermisThickness, 'geometry.dermisThickness');
+        requirePositive(geom.boneWidth, 'geometry.boneWidth');
+        requirePositive(geom.boneHeight, 'geometry.boneHeight');
+        requireFinite(geom.boneOffsetY, 'geometry.boneOffsetY');
+        requireInRange(geom.nailAngularExtent, 'geometry.nailAngularExtent', 0, 180);
+
+        // Optional fingerprint fields (only validate if present)
+        if (fp.fingerprintAngularExtent !== undefined) {
+            requireInRange(fp.fingerprintAngularExtent, 'fingerprint.fingerprintAngularExtent', 0, 180);
+        }
+        if (fp.fingerprintWavelength !== undefined) {
+            requireFinite(fp.fingerprintWavelength, 'fingerprint.fingerprintWavelength');
+            if (fp.fingerprintWavelength < 0.1) {
+                throw new Error(
+                    'Field "fingerprint.fingerprintWavelength" must be >= 0.1 mm ' +
+                    '(got ' + fp.fingerprintWavelength + ').'
+                );
+            }
+        }
+        if (fp.fingerprintRidgeHeight !== undefined) {
+            requireInRange(fp.fingerprintRidgeHeight, 'fingerprint.fingerprintRidgeHeight', 0, 0.2);
+        }
+    }
+
+    /**
+     * Extract settings from a v1 project data object.
+     * Missing optional fields are filled from the application defaults.
+     * @param {Object} data - Parsed project data
+     * @returns {Object} Complete params object ready for applyProjectSettings
+     */
+    function parseVersion1(data) {
+        const defaults = Geometry.getDefaultParameters();
+
+        const geom = (typeof data.geometry === 'object' && data.geometry !== null)
+            ? data.geometry : {};
+        const fp = (typeof data.fingerprint === 'object' && data.fingerprint !== null)
+            ? data.fingerprint : {};
+
+        // Require essential geometry keys
+        const requiredGeomKeys = [
+            'fingerWidth', 'fingerHeight',
+            'stratumCorneumThickness', 'epidermisThickness', 'dermisThickness',
+            'boneWidth', 'boneHeight', 'boneOffsetY', 'nailAngularExtent'
+        ];
+        for (const key of requiredGeomKeys) {
+            if (geom[key] === undefined) {
+                throw new Error('Required field "geometry.' + key + '" is missing.');
+            }
+        }
+
+        // Merge optional fingerprint fields with defaults
+        const merged = {
+            fingerWidth:                 geom.fingerWidth,
+            fingerHeight:                geom.fingerHeight,
+            stratumCorneumThickness:     geom.stratumCorneumThickness,
+            epidermisThickness:          geom.epidermisThickness,
+            dermisThickness:             geom.dermisThickness,
+            boneWidth:                   geom.boneWidth,
+            boneHeight:                  geom.boneHeight,
+            boneOffsetY:                 geom.boneOffsetY,
+            nailAngularExtent:           geom.nailAngularExtent,
+            fingerprintAngularExtent:    fp.fingerprintAngularExtent    !== undefined
+                                            ? fp.fingerprintAngularExtent
+                                            : defaults.fingerprintAngularExtent,
+            fingerprintWavelength:       fp.fingerprintWavelength       !== undefined
+                                            ? fp.fingerprintWavelength
+                                            : defaults.fingerprintWavelength,
+            fingerprintRidgeHeight:      fp.fingerprintRidgeHeight      !== undefined
+                                            ? fp.fingerprintRidgeHeight
+                                            : defaults.fingerprintRidgeHeight
+        };
+
+        validateVersion1Fields(geom, fp);
+
+        return merged;
+    }
+
+    /**
+     * Dispatch parsing to the correct version handler.
+     * Extend the switch for future format versions.
+     * @param {Object} data - Parsed project data (format already verified)
+     * @returns {Object} Validated params object
+     */
+    function parseProjectByVersion(data) {
+        switch (data.formatVersion) {
+            case 1:
+                return parseVersion1(data);
+            default:
+                throw new Error(
+                    'Unsupported project format version: ' + data.formatVersion + '. ' +
+                    'Please update ParaFin to open this file.'
+                );
+        }
+    }
+
+    /**
+     * Public import entry point.
+     * Parses and validates the JSON text; throws on any error so the caller
+     * can decide whether to apply the result.
+     * @param {string} text - Raw file text
+     * @returns {Object} Validated params object
+     * @throws {Error}
+     */
+    function importProjectFromText(text) {
+        const data = parseProjectJSON(text);
+        if (data.units !== 'mm') {
+            throw new Error(
+                'Unsupported unit "' + data.units + '". Only "mm" is supported.'
+            );
+        }
+        return parseProjectByVersion(data);
+    }
+
+    // ---------------------------------------------------------------------------
     // Public API
+    // ---------------------------------------------------------------------------
+
     return {
         generateJSON,
         downloadJSON,
         generateGEO,
-        downloadGEO
+        downloadGEO,
+        importProjectFromText
     };
 })();

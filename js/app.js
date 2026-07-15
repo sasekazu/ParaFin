@@ -43,6 +43,7 @@
         // Other elements
         elements.errorSummary = document.getElementById('errorSummary');
         elements.resetButton = document.getElementById('resetButton');
+        elements.loadProjectButton = document.getElementById('loadProjectButton');
         elements.downloadButton = document.getElementById('downloadButton');
         elements.downloadGeoButton = document.getElementById('downloadGeoButton');
         elements.legend = document.getElementById('legend');
@@ -184,6 +185,31 @@
             updateGeometry();
         });
 
+        // Load Project button
+        elements.loadProjectButton.addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.addEventListener('load', function() {
+                    try {
+                        const importedParams = Exporter.importProjectFromText(reader.result);
+                        setParameters(importedParams);
+                        updateGeometry();
+                    } catch (err) {
+                        clearErrors();
+                        elements.errorSummary.textContent = 'Failed to load project: ' + err.message;
+                        elements.errorSummary.style.display = 'block';
+                    }
+                });
+                reader.readAsText(file);
+            });
+            fileInput.click();
+        });
+
         // Download JSON button
         elements.downloadButton.addEventListener('click', function() {
             if (this.disabled) return;
@@ -192,8 +218,7 @@
             const validation = Geometry.validateParameters(params);
 
             if (validation.valid) {
-                const geometry = Geometry.generateGeometry(params);
-                Exporter.downloadJSON(params, geometry);
+                Exporter.downloadJSON(params);
             }
         });
 
