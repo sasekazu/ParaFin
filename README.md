@@ -81,6 +81,47 @@ Set *h*<sub>ed</sub> to `0` for a smooth interface. A nonzero value must be smal
 
 The fine mesh size must not exceed the bulk mesh size. The transition distance must be greater than the fine-region distance, and distance sampling must be an integer of at least 10.
 
+## Programmatic API
+
+ParaFin's shape-generation logic is also available as a plain, DOM/UI-independent
+JavaScript API, exposed as `window.ParaFin` (see `js/parafin-api.js`). This lets other
+scripts on the same page generate fingertip geometry without touching the UI.
+
+```html
+<script src="js/geometry.js"></script>
+<script src="js/parafin-api.js"></script>
+<script>
+  const result = ParaFin.generate({
+    fingerWidth: 18,
+    fingerHeight: 14
+  });
+
+  console.log(result.boundaries);
+</script>
+```
+
+`ParaFin.generate(parameters)` merges `parameters` on top of the default parameter set,
+validates the merged result, and generates geometry in one call. Missing keys fall back
+to defaults, so `ParaFin.generate({})` returns the default shape. If the merged
+parameters are invalid, it throws an `Error` describing the problem instead of returning
+a partial shape.
+
+On success, it returns an object containing at least:
+
+```js
+{
+  parameters,               // merged parameters used for generation
+  boundaries,               // array of boundary definitions
+  regions,                  // array of region definitions
+  fingerprintMetadata,      // fingerprint ridge layout metadata
+  epidermisDermisMetadata   // dermal papillae layout metadata
+}
+```
+
+The lower-level building blocks are also exposed directly for convenience:
+`ParaFin.getDefaultParameters()`, `ParaFin.validateParameters(params)`, and
+`ParaFin.generateGeometry(params)` (the latter does not validate its input).
+
 ## Coordinate System
 
 - **Origin:** center of the outer finger ellipse
