@@ -51,8 +51,8 @@ const Geometry = (function() {
         fingerprintWavelength: 0.5,     // Ridge wavelength in mm
         fingerprintRidgeHeight: 0.1,    // Ridge height in mm
         epidermisDermisAngularExtent: 140,  // Dermal papillae angular extent (minimum), independent of fingerprint
-        epidermisDermisWavelength: 0.5,     // Dermal papillae wavelength (λ_ed) in mm
-        epidermisDermisHeight: 0,           // Dermal papillae height (h_ed) in mm; 0 = smooth ellipse (default)
+        epidermisDermisWavelength: 1.0,     // Dermal papillae wavelength (λ_ed) in mm
+        epidermisDermisHeight: 0.2,         // Dermal papillae height (h_ed) in mm; 0 = smooth ellipse
         mesh: {
             fineSize: 0.05,
             bulkSize: 0.30,
