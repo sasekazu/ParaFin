@@ -17,11 +17,10 @@
  * - h_b: bone height
  * - e_b: bone vertical offset
  * - α_n: nail angular extent
- * 
- * Future fingerprint parameters (not yet implemented):
  * - α_r: fingerprint angular extent
  * - λ_r: fingerprint wavelength
  * - h_r: fingerprint ridge height
+ * - α_ed: epidermis-dermis interface angular extent (dermal papillae)
  * - λ_ed: epidermis-dermis interface wavelength
  * - h_ed: epidermis-dermis interface height
  * 
@@ -33,6 +32,9 @@
 
 const Geometry = (function() {
     'use strict';
+
+    // Small epsilon for floating-point comparisons (e.g. ridgeHeight === 0)
+    const EPS = 1e-10;
 
     // Default parameter values (based on Serhat et al. 2022, Fig. 5B)
     const DEFAULT_PARAMS = {
@@ -48,6 +50,9 @@ const Geometry = (function() {
         fingerprintAngularExtent: 140,  // Palmar region extent (minimum)
         fingerprintWavelength: 0.5,     // Ridge wavelength in mm
         fingerprintRidgeHeight: 0.1,    // Ridge height in mm
+        epidermisDermisAngularExtent: 140,  // Dermal papillae angular extent (minimum), independent of fingerprint
+        epidermisDermisWavelength: 1.0,     // Dermal papillae wavelength (λ_ed) in mm
+        epidermisDermisHeight: 0.2,         // Dermal papillae height (h_ed) in mm; 0 = smooth ellipse
         mesh: {
             fineSize: 0.05,
             bulkSize: 0.30,
@@ -202,6 +207,34 @@ const Geometry = (function() {
             isValid = false;
         }
 
+        // Epidermis-dermis interface (dermal papillae) parameter validation
+        if (params.epidermisDermisAngularExtent < 0) {
+            errors.epidermisDermisAngularExtent = 'Cannot be negative';
+            isValid = false;
+        }
+        if (params.epidermisDermisAngularExtent > 180) {
+            errors.epidermisDermisAngularExtent = 'Cannot exceed 180°';
+            isValid = false;
+        }
+
+        if (params.epidermisDermisWavelength <= 0) {
+            errors.epidermisDermisWavelength = 'Must be greater than 0';
+            isValid = false;
+        }
+        if (params.epidermisDermisWavelength < 0.1) {
+            errors.epidermisDermisWavelength = 'Minimum wavelength is 0.1 mm (to avoid excessive point count)';
+            isValid = false;
+        }
+
+        if (params.epidermisDermisHeight < 0) {
+            errors.epidermisDermisHeight = 'Cannot be negative';
+            isValid = false;
+        }
+        if (params.epidermisDermisHeight > EPS && params.epidermisDermisHeight >= params.epidermisThickness) {
+            errors.epidermisDermisHeight = 'Must be less than epidermis thickness';
+            isValid = false;
+        }
+
         return { valid: isValid, errors };
     }
 
@@ -335,20 +368,6 @@ const Geometry = (function() {
     }
 
     /**
-     * Generate fingerprint boundary with sinusoidal ridges
-     * Returns a parametric curve (point array) when ridgeHeight > 0, otherwise returns ellipse boundary
-     * @param {string} id - Boundary ID
-     * @param {string} tissueType - Tissue type
-     * @param {number} centerX - Center X coordinate (mm)
-     * @param {number} centerY - Center Y coordinate (mm)
-     * @param {number} width - Ellipse width (mm)
-     * @param {number} height - Ellipse height (mm)
-     * @param {number} angularExtent - Angular extent of fingerprint region (degrees)
-     * @param {number} wavelength - Ridge wavelength (mm)
-     * @param {number} ridgeHeight - Ridge height (mm), 0 = smooth ellipse
-     * @returns {Object} Boundary object
-     */
-    /**
      * Generate fingerprint boundary pair (outer surface and stratum corneum inner surface)
      * with phase-matched ridges to ensure constant thickness along normals.
      * 
@@ -372,49 +391,54 @@ const Geometry = (function() {
     function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHeight, stratumCorneumThickness, angularExtent, wavelength, ridgeHeight) {
         const rx_outer = outerWidth / 2;
         const ry_outer = outerHeight / 2;
-        
-        // If ridgeHeight is 0, return standard ellipse boundaries
-        if (ridgeHeight === 0) {
-            return {
-                outerBoundary: createEllipseBoundary('finger-outer', 'outer-boundary', centerX, centerY, outerWidth, outerHeight),
-                innerBoundary: createEllipseBoundary('stratum-corneum-inner', 'stratum-corneum-inner', centerX, centerY, 
-                    outerWidth - 2 * stratumCorneumThickness, outerHeight - 2 * stratumCorneumThickness),
-                metadata: {
-                    requestedAngularExtent: angularExtent,
-                    actualAngularExtent: 0,
-                    ridgeCount: 0
-                }
-            };
-        }
-        
-        // Calculate circumference using Ramanujan's approximation
+
+        // Calculate circumference using Ramanujan's approximation.
+        // Computed unconditionally so palmar layout metadata is always available.
         const a = Math.max(rx_outer, ry_outer);
         const b = Math.min(rx_outer, ry_outer);
         const h = Math.pow((a - b) / (a + b), 2);
         const circumference = Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
-        
+
         // Estimate arc length for requested angular extent (approximate)
         const requestedArcLength = (angularExtent / 360) * circumference;
-        
+
         // Calculate minimum ridge count to satisfy requested extent
         const minRidgeCount = Math.ceil(requestedArcLength / wavelength);
-        
+
         // Round up to nearest odd number (so ridge peak is at palmar center)
         const ridgeCount = (minRidgeCount % 2 === 0) ? minRidgeCount + 1 : minRidgeCount;
-        
+
         // Actual arc length with integer periods
         const actualArcLength = ridgeCount * wavelength;
-        
+
         // Calculate actual angular extent (approximate, using linear relation)
         const actualAngularExtent = (actualArcLength / circumference) * 360;
-        
+
         // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
         const palmarCenter = 270; // degrees
         const palmarStart = palmarCenter - actualAngularExtent / 2;
         const palmarEnd = palmarCenter + actualAngularExtent / 2;
-        
+
+        // If ridgeHeight is effectively 0, return standard ellipse boundaries.
+        // Full layout metadata (palmarStart, palmarEnd) is included so the exporter
+        // can use the same segmented-boundary topology regardless of ridge amplitude.
+        if (ridgeHeight <= EPS) {
+            return {
+                outerBoundary: createEllipseBoundary('finger-outer', 'outer-boundary', centerX, centerY, outerWidth, outerHeight),
+                innerBoundary: createEllipseBoundary('stratum-corneum-inner', 'stratum-corneum-inner', centerX, centerY,
+                    outerWidth - 2 * stratumCorneumThickness, outerHeight - 2 * stratumCorneumThickness),
+                metadata: {
+                    requestedAngularExtent: angularExtent,
+                    actualAngularExtent: actualAngularExtent,
+                    ridgeCount: ridgeCount,
+                    palmarCenter: palmarCenter,
+                    palmarStart: palmarStart,
+                    palmarEnd: palmarEnd
+                }
+            };
+        }
+
         // Calculate arc length at palmar center (reference point for phase = 0)
-        const palmarCenterRad = palmarCenter * Math.PI / 180;
         const palmarCenterArcLength = (palmarCenter / 360) * circumference;
         
         // Use ~15 points per wavelength for smooth visualization
@@ -518,6 +542,157 @@ const Geometry = (function() {
     }
 
     /**
+     * Generate epidermis-inner boundary with dermal papillae (epidermis-dermis interface ridges).
+     *
+     * Reuses the same waveform approach as generateFingerprintBoundariesPair(), but applied to a
+     * single boundary (epidermis-inner) rather than a phase-matched pair, and driven by its own
+     * independent angular extent / wavelength / height parameters (NOT the fingerprint parameters):
+     * - d(s) = h_ed / 2 * (1 + cos(2πs / λ_ed))
+     * - At palmar center (s=0, 270°): d = h_ed (papilla peak, displaced along outward normal,
+     *   i.e. dermis protrudes toward the epidermis side)
+     * - At period boundaries (s = ±nλ/2): d = 0 and dd/ds = 0 (smooth connection to ellipse)
+     * - Ridge count is odd, with peak at palmar center (270°)
+     * - Angular extent is expanded to fit integer periods symmetrically
+     *
+     * When papillaHeight <= EPS, returns a plain ellipse boundary (no points, no BSpline).
+     *
+     * @param {number} centerX - Center X coordinate
+     * @param {number} centerY - Center Y coordinate
+     * @param {number} width - Epidermis-inner ellipse width (base, undisplaced)
+     * @param {number} height - Epidermis-inner ellipse height (base, undisplaced)
+     * @param {number} angularExtent - Minimum dermal papillae angular extent (α_ed, requested)
+     * @param {number} wavelength - Dermal papillae wavelength (λ_ed)
+     * @param {number} papillaHeight - Dermal papillae height (h_ed)
+     * @returns {Object} Object with boundary and metadata
+     */
+    function generateEpidermisDermisBoundary(centerX, centerY, width, height, angularExtent, wavelength, papillaHeight) {
+        const rx = width / 2;
+        const ry = height / 2;
+
+        // Calculate circumference using Ramanujan's approximation.
+        const a = Math.max(rx, ry);
+        const b = Math.min(rx, ry);
+        const h = Math.pow((a - b) / (a + b), 2);
+        const circumference = Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+
+        // Estimate arc length for requested angular extent (approximate)
+        const requestedArcLength = (angularExtent / 360) * circumference;
+
+        // Calculate minimum ridge count to satisfy requested extent
+        const minRidgeCount = Math.ceil(requestedArcLength / wavelength);
+
+        // Round up to nearest odd number (so papilla peak is at palmar center)
+        const ridgeCount = (minRidgeCount % 2 === 0) ? minRidgeCount + 1 : minRidgeCount;
+
+        // Actual arc length with integer periods
+        const actualArcLength = ridgeCount * wavelength;
+
+        // Calculate actual angular extent (approximate, using linear relation)
+        const actualAngularExtent = (actualArcLength / circumference) * 360;
+
+        // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
+        const palmarCenter = 270; // degrees
+        const palmarStart = palmarCenter - actualAngularExtent / 2;
+        const palmarEnd = palmarCenter + actualAngularExtent / 2;
+
+        // If papillaHeight is effectively 0, return a standard ellipse boundary.
+        // Full layout metadata (palmarStart, palmarEnd) is included so the exporter
+        // can use the same segmented-boundary topology regardless of papilla amplitude.
+        if (papillaHeight <= EPS) {
+            return {
+                boundary: createEllipseBoundary('epidermis-inner', 'epidermis-inner', centerX, centerY, width, height),
+                metadata: {
+                    requestedAngularExtent: angularExtent,
+                    actualAngularExtent: actualAngularExtent,
+                    ridgeCount: ridgeCount,
+                    palmarCenter: palmarCenter,
+                    palmarStart: palmarStart,
+                    palmarEnd: palmarEnd
+                }
+            };
+        }
+
+        // Calculate arc length at palmar center (reference point for phase = 0)
+        const palmarCenterArcLength = (palmarCenter / 360) * circumference;
+
+        // Use ~15 points per wavelength for smooth visualization
+        const pointsPerWavelength = 15;
+        const estimatedWavelengthCount = circumference / wavelength;
+        const totalPoints = Math.max(100, Math.ceil(estimatedWavelengthCount * pointsPerWavelength));
+
+        const points = [];
+
+        for (let i = 0; i < totalPoints; i++) {
+            const theta = (i / totalPoints) * 360; // degrees
+            const thetaRad = theta * Math.PI / 180;
+
+            // Base ellipse point
+            const x0 = rx * Math.cos(thetaRad);
+            const y0 = ry * Math.sin(thetaRad);
+
+            // Arc length up to this point
+            const t = i / totalPoints;
+            const s = t * circumference;
+
+            // Arc length relative to palmar center
+            let s_relative = s - palmarCenterArcLength;
+            if (s_relative > circumference / 2) {
+                s_relative -= circumference;
+            } else if (s_relative < -circumference / 2) {
+                s_relative += circumference;
+            }
+
+            // Outward normal vector for ellipse (rx*cos(θ), ry*sin(θ))
+            const nx = Math.cos(thetaRad) / rx;
+            const ny = Math.sin(thetaRad) / ry;
+            const nMag = Math.sqrt(nx * nx + ny * ny);
+            const nxNorm = nx / nMag;
+            const nyNorm = ny / nMag;
+
+            // Check if this point is in the papillae region
+            let inPapillaRegion = false;
+            if (palmarStart < palmarEnd) {
+                inPapillaRegion = (theta >= palmarStart && theta <= palmarEnd);
+            } else {
+                inPapillaRegion = (theta >= palmarStart || theta <= palmarEnd);
+            }
+
+            // Displacement: d(s) = h_ed / 2 * (1 + cos(2πs / λ_ed))
+            // Displaced along the outward normal, i.e. dermis protrudes toward epidermis side.
+            let displacement = 0;
+            if (inPapillaRegion && papillaHeight > 0) {
+                const phase = 2 * Math.PI * s_relative / wavelength;
+                displacement = (papillaHeight / 2) * (1 + Math.cos(phase));
+            }
+
+            const x = x0 + displacement * nxNorm;
+            const y = y0 + displacement * nyNorm;
+
+            points.push({ x: centerX + x, y: centerY + y });
+        }
+
+        return {
+            boundary: {
+                id: 'epidermis-inner',
+                type: 'parametric-curve',
+                tissueType: 'epidermis-inner',
+                center: [centerX, centerY],
+                width: width,
+                height: height,
+                points: points
+            },
+            metadata: {
+                requestedAngularExtent: angularExtent,
+                actualAngularExtent: actualAngularExtent,
+                ridgeCount: ridgeCount,
+                palmarCenter: palmarCenter,
+                palmarStart: palmarStart,
+                palmarEnd: palmarEnd
+            }
+        };
+    }
+
+    /**
      * Generate complete geometric model from parameters
      * Uses simplified ellipse scaling: inner ellipse dimensions are reduced by 2 × thickness
      * @param {Object} params - Parameter object
@@ -545,17 +720,20 @@ const Geometry = (function() {
         boundaries.push(fingerprintPair.outerBoundary);
         boundaries.push(fingerprintPair.innerBoundary);
 
-        // 3. Epidermis inner boundary (cumulative thickness from outer radius)
+        // 3. Epidermis inner boundary (cumulative thickness from outer radius), with optional
+        // dermal papillae (epidermis-dermis interface ridges), driven by independent angular
+        // extent / wavelength / height parameters (not the fingerprint parameters above).
         const epidermisInnerRx = outerRx - params.stratumCorneumThickness - params.epidermisThickness;
         const epidermisInnerRy = outerRy - params.stratumCorneumThickness - params.epidermisThickness;
-        const epidermisInner = createEllipseBoundary(
-            'epidermis-inner',
-            'epidermis-inner',
+        const epidermisDermisResult = generateEpidermisDermisBoundary(
             0, 0,
             epidermisInnerRx * 2,
-            epidermisInnerRy * 2
+            epidermisInnerRy * 2,
+            params.epidermisDermisAngularExtent,
+            params.epidermisDermisWavelength,
+            params.epidermisDermisHeight
         );
-        boundaries.push(epidermisInner);
+        boundaries.push(epidermisDermisResult.boundary);
 
         // 4. Dermis inner boundary (cumulative thickness from outer radius)
         const dermisInnerRx = outerRx - params.stratumCorneumThickness - params.epidermisThickness - params.dermisThickness;
@@ -657,7 +835,8 @@ const Geometry = (function() {
         return {
             boundaries,
             regions,
-            fingerprintMetadata: fingerprintPair.metadata
+            fingerprintMetadata: fingerprintPair.metadata,
+            epidermisDermisMetadata: epidermisDermisResult.metadata
         };
     }
 
