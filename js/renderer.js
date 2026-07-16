@@ -1,5 +1,5 @@
 /**
- * renderer.js - SVG rendering for ParaFin
+ * renderer.js - SVG rendering for ParaFing
  * 
  * This module handles:
  * - SVG element initialization

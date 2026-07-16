@@ -1,5 +1,5 @@
 /**
- * app.js - Main application controller for ParaFin
+ * app.js - Main application controller for ParaFing
  * 
  * This module handles:
  * - DOM element references

@@ -1,13 +1,13 @@
 /**
- * parafin-api.js - Public, DOM/UI-independent API for ParaFin's shape generation
+ * parafing-api.js - Public, DOM/UI-independent API for ParaFing's shape generation
  *
  * This module exposes a small, stable surface on top of the existing
  * `Geometry` module (see geometry.js) so that other projects/scripts can
- * generate ParaFin fingertip geometry without touching any DOM/UI code.
+ * generate ParaFing fingertip geometry without touching any DOM/UI code.
  *
  * It intentionally does NOT modify geometry.js. It only wraps it.
  *
- * Public API (window.ParaFin):
+ * Public API (window.ParaFing):
  *   - getDefaultParameters()      -> same as Geometry.getDefaultParameters()
  *   - validateParameters(params)  -> same as Geometry.validateParameters()
  *   - validateMeshSettings(mesh)  -> same as Geometry.validateMeshSettings()
@@ -19,7 +19,7 @@
  * shape) when the merged parameters are invalid.
  */
 
-const ParaFin = (function() {
+const ParaFing = (function() {
     'use strict';
 
     /**
@@ -77,7 +77,7 @@ const ParaFin = (function() {
         const isValid = validation.valid && meshValidation.valid;
 
         if (!isValid) {
-            throw new Error('ParaFin.generate: invalid parameters (' + formatErrors(allErrors) + ')');
+            throw new Error('ParaFing.generate: invalid parameters (' + formatErrors(allErrors) + ')');
         }
 
         const geometryResult = Geometry.generateGeometry(merged);
@@ -103,5 +103,5 @@ const ParaFin = (function() {
 
 // Explicit global exposure for use from other scripts/projects in the browser.
 if (typeof window !== 'undefined') {
-    window.ParaFin = ParaFin;
+    window.ParaFing = ParaFing;
 }

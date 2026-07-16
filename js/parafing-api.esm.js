@@ -1,10 +1,10 @@
 /**
- * parafin-api.esm.js - npm / ES Modules entry point for ParaFin's shape generation
+ * parafing-api.esm.js - npm / ES Modules entry point for ParaFin's shape generation
  *
- * This is the Node.js / ES Modules counterpart of js/parafin-api.js (the
+ * This is the Node.js / ES Modules counterpart of js/parafing-api.js (the
  * classic-script version consumed by index.html). It wraps the DOM-independent
  * geometry logic in js/geometry-core.js and exposes the exact same behavior
- * as the browser's window.ParaFin.generate():
+ * as the browser's window.ParaFing.generate():
  *
  *   - Merges `parameters` on top of the default parameters (mesh merged separately)
  *   - Validates the merged parameters and mesh settings
@@ -12,12 +12,12 @@
  *   - Returns { parameters, boundaries, regions, fingerprintMetadata, epidermisDermisMetadata }
  *
  * Usage:
- *   import ParaFin from 'parafin';
- *   const result = ParaFin.generate({ fingerWidth: 18, fingerHeight: 14 });
+ *   import ParaFing from 'parafing';
+ *   const result = ParaFing.generate({ fingerWidth: 18, fingerHeight: 14 });
  *
  * Or with named imports:
  *   import { generate, getDefaultParameters, validateParameters,
- *            validateMeshSettings, generateGeometry } from 'parafin';
+ *            validateMeshSettings, generateGeometry } from 'parafing';
  */
 
 import {
@@ -82,7 +82,7 @@ export function generate(parameters) {
     const isValid = validation.valid && meshValidation.valid;
 
     if (!isValid) {
-        throw new Error('ParaFin.generate: invalid parameters (' + formatErrors(allErrors) + ')');
+        throw new Error('ParaFing.generate: invalid parameters (' + formatErrors(allErrors) + ')');
     }
 
     const geometryResult = generateGeometry(merged);
@@ -99,8 +99,8 @@ export function generate(parameters) {
 // Re-export the lower-level building blocks for convenience.
 export { getDefaultParameters, validateParameters, validateMeshSettings, generateGeometry };
 
-// Default export mirrors the shape of the browser's window.ParaFin object.
-const ParaFin = {
+// Default export mirrors the shape of the browser's window.ParaFing object.
+const ParaFing = {
     getDefaultParameters,
     validateParameters,
     validateMeshSettings,
@@ -108,4 +108,4 @@ const ParaFin = {
     generate
 };
 
-export default ParaFin;
+export default ParaFing;

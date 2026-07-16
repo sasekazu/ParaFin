@@ -3,7 +3,7 @@
  *
  * This is the DOM/browser-independent, ES Module version of the shape
  * generation logic. It is the npm/Node.js entry point for the underlying
- * geometry algorithms and is consumed by js/parafin-api.esm.js.
+ * geometry algorithms and is consumed by js/parafing-api.esm.js.
  *
  * IMPORTANT: This file mirrors js/geometry.js (the classic-script version
  * used by the browser UI) function-for-function and formula-for-formula.

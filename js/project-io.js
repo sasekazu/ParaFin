@@ -1,5 +1,5 @@
 /**
- * project-io.js - JSON import/export for ParaFin projects
+ * project-io.js - JSON import/export for ParaFing projects
  *
  * This module handles:
  * - Saving the current input settings as a minimal project JSON file
@@ -10,7 +10,7 @@ const _ProjectIO = (function() {
     'use strict';
 
     const APP_VERSION = '0.1.0';
-    const PROJECT_FORMAT = 'parafin-project';
+    const PROJECT_FORMAT = 'parafing-project';
     const SUPPORTED_VERSIONS = [1];
 
     // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ const _ProjectIO = (function() {
      * @param {Object} params - Parameter object
      * @param {string} filename - Output filename
      */
-    function downloadJSON(params, filename = 'parafin-project.json') {
+    function downloadJSON(params, filename = 'parafing-project.json') {
         const jsonData = generateJSON(params);
         const jsonString = JSON.stringify(jsonData, null, 2);
 
@@ -103,16 +103,16 @@ const _ProjectIO = (function() {
         }
 
         // Detect legacy format (old boundary-dump export)
-        if (data.application === 'ParaFin' && data.geometry && data.geometry.boundaries) {
+        if (data.application === 'ParaFing' && data.geometry && data.geometry.boundaries) {
             throw new Error(
-                'This JSON file uses an unsupported legacy ParaFin format. ' +
+                'This JSON file uses an unsupported legacy ParaFing format. ' +
                 'Please re-export the model using the current version.'
             );
         }
 
         if (data.format !== PROJECT_FORMAT) {
             throw new Error(
-                'Invalid file: not a ParaFin project file ' +
+                'Invalid file: not a ParaFing project file ' +
                 '(expected format "' + PROJECT_FORMAT + '").'
             );
         }
@@ -310,7 +310,7 @@ const _ProjectIO = (function() {
             default:
                 throw new Error(
                     'Unsupported project format version: ' + data.formatVersion + '. ' +
-                    'Please update ParaFin to open this file.'
+                    'Please update ParaFing to open this file.'
                 );
         }
     }

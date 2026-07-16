@@ -1,17 +1,17 @@
 {
-  "name": "parafin",
+  "name": "parafing",
   "version": "0.1.0",
   "description": "Parametric 2D fingertip geometry generator for finite element analysis",
   "type": "module",
-  "main": "./js/parafin-api.esm.js",
+  "main": "./js/parafing-api.esm.js",
   "exports": {
-    ".": "./js/parafin-api.esm.js"
+    ".": "./js/parafing-api.esm.js"
   },
   "files": [
     "js/geometry.js",
     "js/geometry-core.js",
-    "js/parafin-api.js",
-    "js/parafin-api.esm.js",
+    "js/parafing-api.js",
+    "js/parafing-api.esm.js",
     "README.md",
     "LICENSE"
   ],
@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sasekazu/ParaFin.git"
+    "url": "git+https://github.com/sasekazu/ParaFing.git"
   },
   "scripts": {
     "test": "node test/npm-api-test.js"

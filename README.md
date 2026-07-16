@@ -1,8 +1,8 @@
-# ParaFin
+# ParaFing
 
 **Parametric Fingertip Geometry Generator for FEA**
 
-ParaFin is a browser-based tool for generating and previewing parametric 2D fingertip cross-section models. Project settings can be saved to JSON, and Gmsh-compatible `.geo` files can be exported for finite element meshing.
+ParaFing is a browser-based tool for generating and previewing parametric 2D fingertip cross-section models. Project settings can be saved to JSON, and Gmsh-compatible `.geo` files can be exported for finite element meshing.
 
 ## Features
 
@@ -17,7 +17,7 @@ ParaFin is a browser-based tool for generating and previewing parametric 2D fing
 
 ## Quick Start
 
-[Click here](https://sasekazu.github.io/ParaFin/) to open the demo site, or open index.html in a modern web browser.
+[Click here](https://sasekazu.github.io/ParaFing/) to open the demo site, or open index.html in a modern web browser.
 The application runs entirely in your browser.
 
 ## Parameters
@@ -83,36 +83,36 @@ The fine mesh size must not exceed the bulk mesh size. The transition distance m
 
 ## Installation from GitHub
 
-ParaFin is not published to the npm registry, but it can be installed directly
+ParaFing is not published to the npm registry, but it can be installed directly
 from this GitHub repository (as an ES Module) for use in other Node.js /
 JavaScript projects:
 
 ```bash
-npm install github:sasekazu/ParaFin
+npm install github:sasekazu/ParaFing
 ```
 
 or, equivalently:
 
 ```bash
-npm install https://github.com/sasekazu/ParaFin.git
+npm install https://github.com/sasekazu/ParaFing.git
 ```
 
 To pin a specific tagged version instead of tracking the default branch:
 
 ```bash
-npm install github:sasekazu/ParaFin#v0.1.0
+npm install github:sasekazu/ParaFing#v0.1.0
 ```
 
 ## Programmatic API
 
-ParaFin's shape-generation logic is available as a plain, DOM/UI-independent
+ParaFing's shape-generation logic is available as a plain, DOM/UI-independent
 JavaScript API in two equivalent forms:
 
-- **Browser (classic `<script>` tags):** exposed as `window.ParaFin`
-  (see `js/parafin-api.js`, backed by `js/geometry.js`). This is what `index.html` uses,
+- **Browser (classic `<script>` tags):** exposed as `window.ParaFing`
+  (see `js/parafing-api.js`, backed by `js/geometry.js`). This is what `index.html` uses,
   and it also lets other scripts on the same page generate fingertip geometry without
   touching the UI.
-- **npm / ES Modules:** exposed via `js/parafin-api.esm.js` (backed by
+- **npm / ES Modules:** exposed via `js/parafing-api.esm.js` (backed by
   `js/geometry-core.js`), for use from other Node.js/JavaScript projects after installing
   from GitHub as shown above.
 
@@ -123,9 +123,9 @@ geometry algorithms.
 
 ```html
 <script src="js/geometry.js"></script>
-<script src="js/parafin-api.js"></script>
+<script src="js/parafing-api.js"></script>
 <script>
-  const result = ParaFin.generate({
+  const result = ParaFing.generate({
     fingerWidth: 18,
     fingerHeight: 14
   });
@@ -137,9 +137,9 @@ geometry algorithms.
 ### npm / ES Modules usage
 
 ```js
-import ParaFin from 'parafin';
+import ParaFing from 'parafing';
 
-const result = ParaFin.generate({
+const result = ParaFing.generate({
   fingerWidth: 18,
   fingerHeight: 14
 });
@@ -156,12 +156,12 @@ import {
   validateParameters,
   validateMeshSettings,
   generateGeometry
-} from 'parafin';
+} from 'parafing';
 ```
 
 ### `generate(parameters)` behavior
 
-`generate(parameters)` (i.e. `ParaFin.generate(parameters)` in the browser, or the
+`generate(parameters)` (i.e. `ParaFing.generate(parameters)` in the browser, or the
 `generate`/default export in npm) merges `parameters` on top of the default parameter
 set (the `mesh` sub-object is merged separately), validates the merged result
 (including mesh settings), and generates geometry in one call. Missing keys fall back
@@ -202,7 +202,7 @@ The current format is:
 
 ```json
 {
-  "format": "parafin-project",
+  "format": "parafing-project",
   "formatVersion": 1,
   "units": "mm",
   "geometry": {},
@@ -216,7 +216,7 @@ The current format is:
 
 ## Gmsh GEO Export
 
-`Download GEO` generates `parafin-model.geo` containing:
+`Download GEO` generates `parafing-model.geo` containing:
 
 - OpenCASCADE geometry
 - Ellipse arcs for smooth boundary portions
@@ -247,7 +247,7 @@ The current format is:
 
 ### Mesh-size control
 
-When fingerprint ridges and/or dermal papillae are active, ParaFin writes Gmsh `Distance` and `Threshold` fields that refine the mesh around the corresponding BSpline curves. The element size transitions from `fineSize` near those curves to `bulkSize` farther away.
+When fingerprint ridges and/or dermal papillae are active, ParaFing writes Gmsh `Distance` and `Threshold` fields that refine the mesh around the corresponding BSpline curves. The element size transitions from `fineSize` near those curves to `bulkSize` farther away.
 
 When both wave heights are zero, the exported GEO uses a uniform `bulkSize` instead. The generated file sets:
 
@@ -258,7 +258,7 @@ Mesh.Algorithm = 6;
 Generate a 2D mesh from the command line with:
 
 ```bash
-gmsh parafin-model.geo -2
+gmsh parafing-model.geo -2
 ```
 
 Mesh settings can also be edited directly in the generated GEO file before meshing.

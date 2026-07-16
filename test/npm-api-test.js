@@ -1,7 +1,7 @@
-import ParaFin, {
+import ParaFing, {
     generate,
     getDefaultParameters
-} from '../js/parafin-api.esm.js';
+} from '../js/parafing-api.esm.js';
 
 const defaults = getDefaultParameters();
 const result = generate({
@@ -12,7 +12,7 @@ if (!result.boundaries || !result.regions) {
     throw new Error('Geometry generation failed');
 }
 
-const defaultResult = ParaFin.generate({});
+const defaultResult = ParaFing.generate({});
 
 if (!defaultResult.boundaries) {
     throw new Error('Default export failed');
@@ -21,12 +21,12 @@ if (!defaultResult.boundaries) {
 // Invalid parameters should throw a descriptive Error, not return a partial shape.
 let threw = false;
 try {
-    ParaFin.generate({ fingerWidth: -5 });
+    ParaFing.generate({ fingerWidth: -5 });
 } catch (e) {
     threw = true;
 }
 if (!threw) {
-    throw new Error('Expected ParaFin.generate to throw for invalid parameters');
+    throw new Error('Expected ParaFing.generate to throw for invalid parameters');
 }
 
-console.log('ParaFin npm API test passed');
+console.log('ParaFing npm API test passed');

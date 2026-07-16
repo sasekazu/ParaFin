@@ -1,5 +1,5 @@
 /**
- * geometry.js - Geometric model generation for ParaFin
+ * geometry.js - Geometric model generation for ParaFing
  * 
  * This module handles:
  * - Parameter validation

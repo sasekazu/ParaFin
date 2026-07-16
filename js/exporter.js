@@ -582,7 +582,7 @@ const Exporter = (function() {
      * @param {Object} geometry - Geometry model
      * @param {string} filename - Output filename
      */
-    function downloadGEO(params, geometry, filename = 'parafin-model.geo') {
+    function downloadGEO(params, geometry, filename = 'parafing-model.geo') {
         const geoString = generateGEO(params, geometry);
         
         // Create blob
