@@ -657,7 +657,7 @@ const Geometry = (function() {
      *   from the palmar center (s_relative = 0 at 270°)
      * - At palmar center (s_relative = 0): d = +h_ed/2 (positive peak, displaced along outward
      *   normal, i.e. dermis protrudes toward the epidermis side)
-     * - At the two ends of the applied region: d = 0 (zero-crossing, smooth connection to the
+     * - At the two ends of the applied region: d = 0 (zero-crossing connection to the
      *   base ellipse)
      * - The applied region is built from an odd number of half-waves (each of length λ_ed/2) so
      *   that the center is always a positive peak and both ends are always zero-crossings.
@@ -679,14 +679,20 @@ const Geometry = (function() {
         const rx = width / 2;
         const ry = height / 2;
 
-        // Calculate circumference using Ramanujan's approximation.
-        const a = Math.max(rx, ry);
-        const b = Math.min(rx, ry);
-        const h = Math.pow((a - b) / (a + b), 2);
-        const circumference = Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+        // Build a cumulative arc-length table for the base epidermis-inner ellipse via numerical
+        // integration of ds/dθ = sqrt(rx²sin²θ + ry²cos²θ) (trapezoidal rule, 0.1° steps).
+        const arcTable = buildEllipseArcLengthTable(rx, ry);
+        const circumference = arcTable.circumference;
 
-        // Estimate arc length for requested angular extent (approximate)
-        const requestedArcLength = (angularExtent / 360) * circumference;
+        // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
+        const palmarCenter = 270; // degrees
+
+        // Actual arc length spanned by the user-requested angular range (centered at 270°),
+        // read from the numerically-integrated cumulative arc-length table.
+        const requestedStartAngle = palmarCenter - angularExtent / 2;
+        const requestedEndAngle = palmarCenter + angularExtent / 2;
+        const requestedArcLength = angleDegToArcLengthUnwrapped(arcTable, requestedEndAngle) -
+            angleDegToArcLengthUnwrapped(arcTable, requestedStartAngle);
 
         // Find the minimum number of half-waves (each of length wavelength/2) whose total
         // length reaches at least the requested arc length.
@@ -695,24 +701,39 @@ const Geometry = (function() {
 
         // Force an odd half-wave count: this guarantees a positive peak at the palmar center
         // (phase = 0) and a zero-crossing at both ends of the applied region (phase = ±nπ/2 with
-        // n odd), so the waveform connects smoothly to the base ellipse.
+        // n odd), so the waveform has a zero-crossing connection to the base ellipse.
         const halfWaveCount = (minHalfWaveCount % 2 === 0) ? minHalfWaveCount + 1 : Math.max(1, minHalfWaveCount);
 
         // Actual arc length spanned by the applied region (may be slightly larger than requested
         // so that it ends exactly on a zero-crossing)
         const actualArcLength = halfWaveCount * wavelength / 2;
+        const halfActualArcLength = actualArcLength / 2;
 
         // Retain "ridgeCount" as the metadata field name for compatibility with existing
         // consumers (exporter, etc.); it now holds the (odd) half-wave count.
         const ridgeCount = halfWaveCount;
 
-        // Calculate actual angular extent (approximate, using linear relation)
-        const actualAngularExtent = (actualArcLength / circumference) * 360;
+        // Arc length at palmar center (reference point for phase = 0, and for locating the
+        // actual start/end angles below)
+        const palmarCenterArcLength = angleDegToArcLength(arcTable, palmarCenter);
 
-        // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
-        const palmarCenter = 270; // degrees
-        const palmarStart = palmarCenter - actualAngularExtent / 2;
-        const palmarEnd = palmarCenter + actualAngularExtent / 2;
+        // Locate the angles ±actualArcLength/2 away from the palmar center along the ellipse,
+        // via inverse (arc length → angle) lookup on the same cumulative table. This correctly
+        // accounts for arc length wrapping around the 0°/360° boundary near the palmar center.
+        const sStart = palmarCenterArcLength - halfActualArcLength;
+        const sEnd = palmarCenterArcLength + halfActualArcLength;
+
+        const palmarStart = (sStart >= 0)
+            ? arcLengthToAngleDeg(arcTable, sStart)
+            : arcLengthToAngleDeg(arcTable, sStart + circumference) - 360;
+
+        const palmarEnd = (sEnd <= circumference)
+            ? arcLengthToAngleDeg(arcTable, sEnd)
+            : arcLengthToAngleDeg(arcTable, sEnd - circumference) + 360;
+
+        // Actual angular extent achieved, derived from the arc-length table (not a linear
+        // angle/arc-length relation)
+        const actualAngularExtent = palmarEnd - palmarStart;
 
         // If papillaHeight is effectively 0, return a standard ellipse boundary.
         // Full layout metadata (palmarStart, palmarEnd) is included so the exporter
@@ -732,9 +753,6 @@ const Geometry = (function() {
             };
         }
 
-        // Calculate arc length at palmar center (reference point for phase = 0)
-        const palmarCenterArcLength = (palmarCenter / 360) * circumference;
-
         // Use ~15 points per wavelength for smooth visualization
         const pointsPerWavelength = 15;
         const estimatedWavelengthCount = circumference / wavelength;
@@ -750,9 +768,9 @@ const Geometry = (function() {
             const x0 = rx * Math.cos(thetaRad);
             const y0 = ry * Math.sin(thetaRad);
 
-            // Arc length up to this point
-            const t = i / totalPoints;
-            const s = t * circumference;
+            // Arc length up to this point, read from the numerically-integrated cumulative
+            // arc-length table (not a uniform-parameter approximation)
+            const s = angleDegToArcLength(arcTable, theta);
 
             // Arc length relative to palmar center
             let s_relative = s - palmarCenterArcLength;
@@ -772,7 +790,6 @@ const Geometry = (function() {
             // Check if this point is within the applied papillae region, using the signed
             // arc length from the palmar center (s_relative) rather than the angle theta,
             // per requirement 9. The applied region spans [-actualArcLength/2, +actualArcLength/2].
-            const halfActualArcLength = actualArcLength / 2;
             const inPapillaRegion = (s_relative >= -halfActualArcLength && s_relative <= halfActualArcLength);
 
             // Displacement: signed sine wave around the base ellipse.
