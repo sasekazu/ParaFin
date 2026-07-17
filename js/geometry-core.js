@@ -377,6 +377,96 @@ function createRegion(id, name, tissueType, outerBoundary, innerBoundary = null,
     return region;
 }
 
+// Number of angular subdivisions used to numerically integrate the ellipse arc-length
+// element ds/dθ = sqrt(a²sin²θ + b²cos²θ) via the trapezoidal rule (0.1° per step).
+const ARC_LENGTH_TABLE_DIVISIONS = 3600;
+
+/**
+ * Build a cumulative arc-length table for the reference ellipse x = a cos θ, y = b sin θ,
+ * θ ∈ [0, 2π], via trapezoidal-rule numerical integration of ds/dθ = sqrt(a²sin²θ + b²cos²θ).
+ * @param {number} a - Semi-axis along x
+ * @param {number} b - Semi-axis along y
+ * @returns {{thetas: number[], cumulativeArcLength: number[], circumference: number}}
+ */
+function buildEllipseArcLengthTable(a, b) {
+    const n = ARC_LENGTH_TABLE_DIVISIONS;
+    const dTheta = (2 * Math.PI) / n;
+    const thetas = new Array(n + 1);
+    const cumulativeArcLength = new Array(n + 1);
+
+    const dsdTheta = (theta) => {
+        const sinT = Math.sin(theta);
+        const cosT = Math.cos(theta);
+        return Math.sqrt(a * a * sinT * sinT + b * b * cosT * cosT);
+    };
+
+    thetas[0] = 0;
+    cumulativeArcLength[0] = 0;
+    let prevDeriv = dsdTheta(0);
+    for (let i = 1; i <= n; i++) {
+        const theta = i * dTheta;
+        const deriv = dsdTheta(theta);
+        cumulativeArcLength[i] = cumulativeArcLength[i - 1] + 0.5 * (prevDeriv + deriv) * dTheta;
+        thetas[i] = theta;
+        prevDeriv = deriv;
+    }
+
+    return { thetas, cumulativeArcLength, circumference: cumulativeArcLength[n] };
+}
+
+/**
+ * Interpolate cumulative arc length at a given angle (degrees, normalized to [0, 360))
+ * from a table built by buildEllipseArcLengthTable().
+ */
+function angleDegToArcLength(table, angleDeg) {
+    let angle = angleDeg % 360;
+    if (angle < 0) angle += 360;
+    const n = ARC_LENGTH_TABLE_DIVISIONS;
+    const dTheta = (2 * Math.PI) / n;
+    const idxFloat = (angle * Math.PI / 180) / dTheta;
+    const idx0 = Math.min(n - 1, Math.floor(idxFloat));
+    const idx1 = idx0 + 1;
+    const frac = idxFloat - idx0;
+    const { cumulativeArcLength } = table;
+    return cumulativeArcLength[idx0] + frac * (cumulativeArcLength[idx1] - cumulativeArcLength[idx0]);
+}
+
+/**
+ * Same as angleDegToArcLength(), but accepts angles outside [0, 360) (negative, or beyond
+ * 360°) by unwrapping through whole-circumference multiples, so arc length stays
+ * monotonically increasing with angle across the 0°/360° period boundary.
+ */
+function angleDegToArcLengthUnwrapped(table, angleDeg) {
+    const wraps = Math.floor(angleDeg / 360);
+    const angleMod = angleDeg - wraps * 360;
+    return wraps * table.circumference + angleDegToArcLength(table, angleMod);
+}
+
+/**
+ * Inverse lookup: given a target cumulative arc length s (clamped to [0, circumference]),
+ * find the corresponding angle (degrees) via binary search over the table plus linear
+ * interpolation between the bracketing samples.
+ */
+function arcLengthToAngleDeg(table, s) {
+    const arr = table.cumulativeArcLength;
+    let lo = 0;
+    let hi = arr.length - 1;
+    const clamped = Math.min(Math.max(s, arr[0]), arr[hi]);
+    while (hi - lo > 1) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid] <= clamped) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    const s0 = arr[lo];
+    const s1 = arr[hi];
+    const frac = (s1 > s0) ? (clamped - s0) / (s1 - s0) : 0;
+    const thetaRad = table.thetas[lo] + frac * (table.thetas[hi] - table.thetas[lo]);
+    return thetaRad * 180 / Math.PI;
+}
+
 /**
  * Generate fingerprint boundary pair (outer surface and stratum corneum inner surface)
  * with phase-matched ridges to ensure constant thickness along normals.
@@ -402,15 +492,21 @@ function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHe
     const rx_outer = outerWidth / 2;
     const ry_outer = outerHeight / 2;
 
-    // Calculate circumference using Ramanujan's approximation.
+    // Build a cumulative arc-length table for the outer reference ellipse via numerical
+    // integration of ds/dθ = sqrt(rx²sin²θ + ry²cos²θ) (trapezoidal rule, 0.1° steps).
     // Computed unconditionally so palmar layout metadata is always available.
-    const a = Math.max(rx_outer, ry_outer);
-    const b = Math.min(rx_outer, ry_outer);
-    const h = Math.pow((a - b) / (a + b), 2);
-    const circumference = Math.PI * (a + b) * (1 + (3 * h) / (10 + Math.sqrt(4 - 3 * h)));
+    const arcTable = buildEllipseArcLengthTable(rx_outer, ry_outer);
+    const circumference = arcTable.circumference;
 
-    // Estimate arc length for requested angular extent (approximate)
-    const requestedArcLength = (angularExtent / 360) * circumference;
+    // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
+    const palmarCenter = 270; // degrees
+
+    // Actual arc length spanned by the user-requested angular range (centered at 270°),
+    // read from the numerically-integrated cumulative arc-length table.
+    const requestedStartAngle = palmarCenter - angularExtent / 2;
+    const requestedEndAngle = palmarCenter + angularExtent / 2;
+    const requestedArcLength = angleDegToArcLengthUnwrapped(arcTable, requestedEndAngle) -
+        angleDegToArcLengthUnwrapped(arcTable, requestedStartAngle);
 
     // Calculate minimum ridge count to satisfy requested extent
     const minRidgeCount = Math.ceil(requestedArcLength / wavelength);
@@ -420,14 +516,29 @@ function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHe
 
     // Actual arc length with integer periods
     const actualArcLength = ridgeCount * wavelength;
+    const halfActualArcLength = actualArcLength / 2;
 
-    // Calculate actual angular extent (approximate, using linear relation)
-    const actualAngularExtent = (actualArcLength / circumference) * 360;
+    // Arc length at palmar center (reference point for phase = 0, and for locating the
+    // actual start/end angles below)
+    const palmarCenterArcLength = angleDegToArcLength(arcTable, palmarCenter);
 
-    // Palmar region is centered at 270° (bottom of ellipse, -Y direction)
-    const palmarCenter = 270; // degrees
-    const palmarStart = palmarCenter - actualAngularExtent / 2;
-    const palmarEnd = palmarCenter + actualAngularExtent / 2;
+    // Locate the angles ±actualArcLength/2 away from the palmar center along the ellipse,
+    // via inverse (arc length → angle) lookup on the same cumulative table. This correctly
+    // accounts for arc length wrapping around the 0°/360° boundary near the palmar center.
+    const sStart = palmarCenterArcLength - halfActualArcLength;
+    const sEnd = palmarCenterArcLength + halfActualArcLength;
+
+    const palmarStart = (sStart >= 0)
+        ? arcLengthToAngleDeg(arcTable, sStart)
+        : arcLengthToAngleDeg(arcTable, sStart + circumference) - 360;
+
+    const palmarEnd = (sEnd <= circumference)
+        ? arcLengthToAngleDeg(arcTable, sEnd)
+        : arcLengthToAngleDeg(arcTable, sEnd - circumference) + 360;
+
+    // Actual angular extent achieved, derived from the arc-length table (not a linear
+    // angle/arc-length relation)
+    const actualAngularExtent = palmarEnd - palmarStart;
 
     // If ridgeHeight is effectively 0, return standard ellipse boundaries.
     // Full layout metadata (palmarStart, palmarEnd) is included so the exporter
@@ -448,9 +559,6 @@ function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHe
         };
     }
 
-    // Calculate arc length at palmar center (reference point for phase = 0)
-    const palmarCenterArcLength = (palmarCenter / 360) * circumference;
-
     // Use ~15 points per wavelength for smooth visualization
     const pointsPerWavelength = 15;
     const estimatedWavelengthCount = circumference / wavelength;
@@ -468,9 +576,9 @@ function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHe
         const x0_outer = rx_outer * Math.cos(thetaRad);
         const y0_outer = ry_outer * Math.sin(thetaRad);
 
-        // Calculate arc length up to this point using outer ellipse
-        const t = i / totalPoints;
-        const s_outer = t * circumference;
+        // Arc length up to this point, read from the numerically-integrated cumulative
+        // arc-length table (not a uniform-parameter approximation)
+        const s_outer = angleDegToArcLength(arcTable, theta);
 
         // Arc length relative to palmar center
         let s_relative = s_outer - palmarCenterArcLength;
@@ -489,14 +597,10 @@ function generateFingerprintBoundariesPair(centerX, centerY, outerWidth, outerHe
         const nxNorm = nx / nMag;
         const nyNorm = ny / nMag;
 
-        // Check if this point is in the fingerprint region
-        let inFingerprintRegion = false;
-        if (palmarStart < palmarEnd) {
-            inFingerprintRegion = (theta >= palmarStart && theta <= palmarEnd);
-        } else {
-            // Handle wrap-around (unlikely for palmar region)
-            inFingerprintRegion = (theta >= palmarStart || theta <= palmarEnd);
-        }
+        // Check if this point is in the fingerprint region, using the signed arc length
+        // from the palmar center (matches ±actualArcLength/2 exactly, and naturally
+        // handles wrap-around across the 270° palmar center without a separate branch)
+        const inFingerprintRegion = (s_relative >= -halfActualArcLength && s_relative <= halfActualArcLength);
 
         // Calculate displacement: d(s) = h_r / 2 * (1 - cos(2πs / λ_r))
         // At palmar center (s_relative = 0), we want a ridge peak (d = h_r)
