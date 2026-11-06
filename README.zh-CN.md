@@ -31,7 +31,7 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 
 如果使用 Gmsh 图形界面，请打开 `.geo` 文件，执行 `Mesh` → `2D`，然后通过 `File` → `Export` 保存网格。详情请参阅 [Gmsh GEO 导出](#gmsh-geo-导出)。
 
-使用默认参数生成的文件（`.geo`、项目 `.json`，以及 MSH 4.1 和 MSH 2.2 两种格式的 `.msh`）已附在每个[发布版本](https://github.com/sasekazu/ParaFin/releases)中。
+使用默认参数生成的文件（`.geo`、项目 `.json`，以及 MSH 4.1 和 MSH 2.2 两种格式的 `.msh`）已附在每个[发布版本](https://github.com/sasekazu/ParaFin/releases)中。可从[最新发布版本](https://github.com/sasekazu/ParaFin/releases/latest)下载。
 
 ## 参数
 

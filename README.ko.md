@@ -31,7 +31,7 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 
 Gmsh GUI를 사용하려면 `.geo` 파일을 열고 `Mesh` → `2D`를 실행한 뒤, `File` → `Export`로 메시를 저장합니다. 자세한 내용은 [Gmsh GEO 내보내기](#gmsh-geo-내보내기)를 참조하세요.
 
-기본 매개변수로 생성한 파일(`.geo`, 프로젝트 `.json`, 그리고 MSH 4.1 및 MSH 2.2 형식의 `.msh`)은 각 [릴리스](https://github.com/sasekazu/ParaFin/releases)에 첨부되어 있습니다.
+기본 매개변수로 생성한 파일(`.geo`, 프로젝트 `.json`, 그리고 MSH 4.1 및 MSH 2.2 형식의 `.msh`)은 각 [릴리스](https://github.com/sasekazu/ParaFin/releases)에 첨부되어 있습니다. [최신 릴리스](https://github.com/sasekazu/ParaFin/releases/latest)에서 다운로드할 수 있습니다.
 
 ## 매개변수
 
