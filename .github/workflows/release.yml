@@ -1,0 +1,104 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds the default model and publishes a GitHub
+# release with the generated files. GitHub attaches the source archives itself.
+# Run manually (workflow_dispatch) to build the files as a downloadable
+# workflow artifact without publishing a release.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  # Pinned so the generated meshes are reproducible.
+  GMSH_VERSION: '4.15.2'
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run tests
+        run: npm test
+
+      - name: Check tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package.json version ${VERSION}" >&2
+            exit 1
+          fi
+
+      - name: Generate default GEO and project JSON
+        run: npm run export:defaults -- dist
+
+      - name: Install Gmsh
+        run: |
+          # The Gmsh wheel loads libGLU at import time.
+          sudo apt-get update
+          sudo apt-get install -y libglu1-mesa
+          python -m pip install "gmsh==${GMSH_VERSION}"
+          gmsh --version
+
+      - name: Generate meshes
+        working-directory: dist
+        run: |
+          gmsh parafin-model.geo -2 -o parafin-model.msh
+          gmsh parafin-model.geo -2 -format msh2 -o parafin-model-msh2.msh
+
+      - name: Verify outputs
+        working-directory: dist
+        run: |
+          grep -q '^4\.1 ' <(sed -n 2p parafin-model.msh)      || { echo 'parafin-model.msh is not MSH 4.1' >&2; exit 1; }
+          grep -q '^2\.2 ' <(sed -n 2p parafin-model-msh2.msh) || { echo 'parafin-model-msh2.msh is not MSH 2.2' >&2; exit 1; }
+          for f in parafin-model.msh parafin-model-msh2.msh; do
+            grep -q '^\$PhysicalNames' "$f" || { echo "$f has no physical groups" >&2; exit 1; }
+          done
+          ls -l
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: parafin-default-model
+          path: dist/*
+
+      - name: Create release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > release-notes.md <<NOTES
+          ## Default model files
+
+          Generated from this tag's source with the default parameters
+          (Gmsh ${GMSH_VERSION}).
+
+          | File | Description |
+          |---|---|
+          | \`parafin-model.geo\` | Gmsh geometry |
+          | \`parafin-model.json\` | Project JSON (loadable with \`Load Project\`) |
+          | \`parafin-model.msh\` | 2D mesh, MSH 4.1 format |
+          | \`parafin-model-msh2.msh\` | 2D mesh, MSH 2.2 format |
+          NOTES
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file release-notes.md \
+            --generate-notes \
+            dist/parafin-model.geo \
+            dist/parafin-model.json \
+            dist/parafin-model.msh \
+            dist/parafin-model-msh2.msh
