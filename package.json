@@ -28,6 +28,7 @@
     "url": "git+https://github.com/sasekazu/ParaFin.git"
   },
   "scripts": {
-    "test": "node test/npm-api-test.js"
+    "test": "node test/npm-api-test.js",
+    "export:defaults": "node scripts/export-defaults.mjs"
   }
 }

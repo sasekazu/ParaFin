@@ -31,6 +31,8 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 
 Gmsh の GUI を使う場合は、`.geo` ファイルを開き、`Mesh` → `2D` を実行して、`File` → `Export` でメッシュを保存します。詳細は [Gmsh GEOエクスポート](#gmsh-geoエクスポート) を参照してください。
 
+既定のパラメータで生成したファイル（`.geo`、プロジェクト `.json`、および MSH 4.1 形式と MSH 2.2 形式の `.msh`）は、各[リリース](https://github.com/sasekazu/ParaFin/releases)に添付されています。
+
 ## パラメータ
 
 幾何学的な長さはすべてミリメートル、角度は度で指定します。

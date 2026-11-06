@@ -29,6 +29,8 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 
 If you prefer the Gmsh GUI, open the `.geo` file, run `Mesh` → `2D`, and save the mesh with `File` → `Export`. See [Gmsh GEO Export](#gmsh-geo-export) for details.
 
+Files generated with the default parameters (`.geo`, project `.json`, and `.msh` in both MSH 4.1 and MSH 2.2 formats) are attached to each [release](https://github.com/sasekazu/ParaFin/releases).
+
 ## Parameters
 
 All geometric lengths are specified in millimeters and angles in degrees.
