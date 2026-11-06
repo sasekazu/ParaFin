@@ -1,3 +1,5 @@
+**English** | [日本語](README.ja.md) | [한국어](README.ko.md) | [简体中文](README.zh-CN.md)
+
 # ParaFin
 
 **Parametric Fingertip Geometry Generator for FEA**
@@ -17,8 +19,15 @@ ParaFin is a browser-based tool for generating and previewing parametric 2D fing
 
 ## Quick Start
 
-[Click here](https://sasekazu.github.io/ParaFin/) to open the demo site, or open index.html in a modern web browser.
-The application runs entirely in your browser.
+1. Open the [demo site](https://sasekazu.github.io/ParaFin/), or open `index.html` in a modern web browser. The application runs entirely in your browser.
+2. Adjust the parameters, then click `Download GEO` to save `parafin-model.geo`.
+3. Convert the GEO file to a 2D mesh (`.msh`) with [Gmsh](https://gmsh.info/):
+
+```bash
+gmsh parafin-model.geo -2 -o parafin-model.msh
+```
+
+If you prefer the Gmsh GUI, open the `.geo` file, run `Mesh` → `2D`, and save the mesh with `File` → `Export`. See [Gmsh GEO Export](#gmsh-geo-export) for details.
 
 ## Parameters
 
@@ -259,6 +268,12 @@ Generate a 2D mesh from the command line with:
 
 ```bash
 gmsh parafin-model.geo -2
+```
+
+Gmsh writes MSH 4.1 files by default. If your solver or tool only reads MSH 2.2, add `-format msh2`:
+
+```bash
+gmsh parafin-model.geo -2 -format msh2 -o parafin-model.msh
 ```
 
 Mesh settings can also be edited directly in the generated GEO file before meshing.
