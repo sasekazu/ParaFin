@@ -794,3 +794,15 @@ body.drag-active::after {
 .filename-popover[hidden] {
     display: none;
 }
+
+/* Hide the number-field spin buttons (the slider and typing are used instead) */
+.param-group input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.param-group input[type="number"]::-webkit-inner-spin-button,
+.param-group input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
