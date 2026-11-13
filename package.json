@@ -28,7 +28,8 @@
     "url": "git+https://github.com/sasekazu/ParaFin.git"
   },
   "scripts": {
-    "test": "node test/npm-api-test.js",
-    "export:defaults": "node scripts/export-defaults.mjs"
+    "test": "node test/npm-api-test.js && node test/geometry-parity-test.js",
+    "export:defaults": "node scripts/export-defaults.mjs",
+    "test:ui": "node test/ui-smoke-test.mjs"
   }
 }

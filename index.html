@@ -9,12 +9,27 @@
 <body>
     <header>
         <h1>ParaFin <span class="subtitle">Parametric Finger Geometry Generator</span></h1>
+        <div class="header-actions">
+            <span class="actions-hint" id="actionsHint" role="status" style="display: none;"></span>
+            <div class="filename-menu">
+                <button type="button" id="fileNameToggle" class="btn btn-header btn-ghost" aria-expanded="false" aria-controls="fileNamePopover" title="Set the base name of downloaded files">File name&hellip;</button>
+                <div class="filename-popover filename-group" id="fileNamePopover" hidden>
+                    <label for="exportFileName">File name <span class="parameter-unit">(optional)</span></label>
+                    <input type="text" id="exportFileName" placeholder="parafin-model" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="fileNameHelp">
+                    <small id="fileNameHelp">Base name for downloaded .geo, .json and image files.</small>
+                </div>
+            </div>
+            <button id="loadProjectButton" class="btn btn-header btn-secondary" title="Load a project JSON file (or drop it on the page)">Load Project</button>
+            <button id="resetButton" class="btn btn-header btn-secondary">Reset to Defaults</button>
+            <button id="downloadButton" class="btn btn-header btn-primary">Download JSON</button>
+            <button id="downloadGeoButton" class="btn btn-header btn-primary">Download GEO</button>
+        </div>
     </header>
 
     <div class="container">
         <!-- Left Panel: Parameters -->
         <aside class="parameters-panel">
-            <div class="error-summary" id="errorSummary"></div>
+            <div class="error-summary" id="errorSummary" aria-live="polite"></div>
 
             <!-- Finger Section -->
             <section class="param-section">
@@ -190,7 +205,7 @@
             <section class="param-section collapsible collapsed" id="meshSettingsSection">
                 <h2 class="section-toggle" tabindex="0" role="button" aria-expanded="false" title="Click to expand/collapse">Mesh Settings <span class="toggle-icon" aria-hidden="true"></span></h2>
                 <div class="section-content">
-                <div class="param-group">
+                <div class="param-group no-slider">
                     <label for="meshFineSize">
                         <span class="parameter-name">Fine mesh size</span>
                         <span class="parameter-unit">[mm]</span>
@@ -198,7 +213,7 @@
                     <input type="number" id="meshFineSize" step="0.005" min="0.001" aria-label="Fine mesh size in millimeters">
                     <div class="error-message" id="errorMeshFineSize"></div>
                 </div>
-                <div class="param-group">
+                <div class="param-group no-slider">
                     <label for="meshBulkSize">
                         <span class="parameter-name">Bulk mesh size</span>
                         <span class="parameter-unit">[mm]</span>
@@ -206,7 +221,7 @@
                     <input type="number" id="meshBulkSize" step="0.01" min="0.001" aria-label="Bulk mesh size in millimeters">
                     <div class="error-message" id="errorMeshBulkSize"></div>
                 </div>
-                <div class="param-group">
+                <div class="param-group no-slider">
                     <label for="meshFineDistance">
                         <span class="parameter-name">Fine-region distance</span>
                         <span class="parameter-unit">[mm]</span>
@@ -214,7 +229,7 @@
                     <input type="number" id="meshFineDistance" step="0.01" min="0" aria-label="Fine-region distance in millimeters">
                     <div class="error-message" id="errorMeshFineDistance"></div>
                 </div>
-                <div class="param-group">
+                <div class="param-group no-slider">
                     <label for="meshTransitionDistance">
                         <span class="parameter-name">Transition distance</span>
                         <span class="parameter-unit">[mm]</span>
@@ -222,7 +237,7 @@
                     <input type="number" id="meshTransitionDistance" step="0.01" min="0" aria-label="Transition distance in millimeters">
                     <div class="error-message" id="errorMeshTransitionDistance"></div>
                 </div>
-                <div class="param-group">
+                <div class="param-group no-slider">
                     <label for="meshDistanceSampling">
                         <span class="parameter-name">Distance sampling</span>
                     </label>
@@ -231,36 +246,40 @@
                 </div>
                 </div>
             </section>
-
-            <!-- Action Buttons -->
-            <div class="actions">
-                <button id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
-                <button id="loadProjectButton" class="btn btn-secondary">Load Project</button>
-                <button id="downloadButton" class="btn btn-primary">Download JSON</button>
-                <button id="downloadGeoButton" class="btn btn-primary">Download GEO</button>
-            </div>
         </aside>
 
         <!-- Right Panel: Geometry Preview -->
         <main class="preview-panel">
-            <div class="preview-header">
-                <h2>Geometry Preview</h2>
-            </div>
             <div class="preview-views">
                 <div class="view-container main-view">
-                    <h3 class="view-title">Cross Section (Full View)</h3>
-                    <div class="svg-container" id="mainViewContainer">
+                    <h3 class="view-title"><span>Cross Section (Full View)</span><span class="view-hint">Wheel: zoom &middot; Drag: pan &middot; Double-click: reset</span></h3>
+                    <div class="svg-container" id="mainViewContainer" tabindex="0" role="group" aria-label="Cross section full view. Scroll or pinch to zoom, drag to pan, double-click or press 0 to reset.">
                         <svg id="mainSvg"></svg>
+                        <div class="view-tools">
+                            <button type="button" data-action="save-svg" data-view="main" title="Save this view as SVG" aria-label="Save this view as SVG">SVG</button>
+                            <button type="button" data-action="save-png" data-view="main" title="Save this view as PNG" aria-label="Save this view as PNG">PNG</button>
+                        </div>
                     </div>
                 </div>
                 <div class="view-container detail-view">
                     <h3 class="view-title">Fingerprint Detail (Magnified)</h3>
-                    <div class="svg-container" id="detailViewContainer">
+                    <div class="svg-container" id="detailViewContainer" tabindex="0" role="group" aria-label="Fingerprint detail magnified view. Scroll or pinch to zoom, drag to pan, double-click or press 0 to reset.">
                         <svg id="detailSvg"></svg>
+                        <div class="view-tools">
+                            <button type="button" data-action="save-svg" data-view="detail" title="Save this view as SVG" aria-label="Save this view as SVG">SVG</button>
+                            <button type="button" data-action="save-png" data-view="detail" title="Save this view as PNG" aria-label="Save this view as PNG">PNG</button>
+                        </div>
                     </div>
                 </div>
             </div>
-            <div class="legend" id="legend"></div>
+            <div class="preview-footer">
+                <div class="legend" id="legend"></div>
+                <fieldset class="view-options">
+                    <legend>Display</legend>
+                    <label><input type="checkbox" id="showAxes" checked> X / Y axes</label>
+                    <label><input type="checkbox" id="showDetail" checked> Fingerprint detail</label>
+                </fieldset>
+            </div>
         </main>
     </div>
 

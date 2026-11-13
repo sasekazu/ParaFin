@@ -15,6 +15,7 @@ ParaFin is a browser-based tool for generating and previewing parametric 2D fing
 - Project save/load using JSON
 - Gmsh `.geo` export with physical groups
 - Embedded uniform or locally refined mesh-size settings
+- Inputs are saved automatically in the browser (`localStorage`) and restored on the next visit; use `Reset to Defaults` to start over
 - No installation, build process, or web server required
 
 ## Quick Start
@@ -30,6 +31,23 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 If you prefer the Gmsh GUI, open the `.geo` file, run `Mesh` → `2D`, and save the mesh with `File` → `Export`. See [Gmsh GEO Export](#gmsh-geo-export) for details.
 
 Files generated with the default parameters (`.geo`, project `.json`, and `.msh` in both MSH 4.1 and MSH 2.2 formats) are attached to each [release](https://github.com/sasekazu/ParaFin/releases). Download them from the [latest release](https://github.com/sasekazu/ParaFin/releases/latest).
+
+## Preview Controls
+
+Both preview panels (full cross section and fingerprint detail) can be zoomed and panned.
+
+| Action | Mouse / touch | Keyboard (panel focused) |
+|---|---|---|
+| Zoom | Mouse wheel or pinch | `+` / `-` |
+| Pan | Drag | Arrow keys |
+| Reset view | Double-click | `0` |
+| Save image | `SVG` / `PNG` buttons in each view | |
+
+Until you zoom or pan, each view is fitted automatically when parameters change or the window is resized. Once you zoom or pan, your view is kept; double-click the view (or press `0`) to return to automatic fitting. The scale bar adapts to the zoom level.
+
+The `Display` checkboxes under the preview hide the X/Y axes and the fingerprint detail view; both choices are remembered. The `SVG` and `PNG` buttons save the view exactly as shown (including the current zoom and, if enabled, the axes, plus the scale bar) on a white background; PNG files are saved at twice the on-screen size.
+
+The optional `File name…` button in the header opens a field that sets the base name of downloaded `.geo`, `.json` and image files (e.g. `finger` → `finger.geo`, `finger.json`, `finger-cross-section.svg`). Leave it empty for the default names. You can also load a project by dropping a `.json` file onto the page, and the `?` buttons next to each parameter show a short explanation.
 
 ## Parameters
 
@@ -307,6 +325,17 @@ Additional limitations:
 - The nail is represented by an elliptical dorsal region.
 - Fingerprint ridges and dermal papillae use sampled parametric curves rather than anatomically reconstructed surfaces.
 - The exported mesh settings provide one shared refinement scheme rather than tissue-specific element sizes or boundary-layer meshes.
+
+## Development
+
+```bash
+npm test          # API test and geometry parity test (Node only, no dependencies)
+npm run test:ui   # browser smoke test of index.html (requires Playwright)
+```
+
+`js/geometry.js` (classic script, used by `index.html`) and `js/geometry-core.js` (ES module, used by the npm package) are maintained as copies of the same algorithms, because `index.html` must keep working from `file://`. `npm test` runs both over valid and invalid parameter sets and fails if their results differ, so a change must be applied to both files.
+
+The UI test needs Playwright, which is not a dependency of this package: `npm install --no-save playwright && npx playwright install chromium`.
 
 ## Reference
 

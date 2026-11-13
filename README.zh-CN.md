@@ -17,6 +17,7 @@ ParaFin 是一个基于浏览器的工具，用于生成并预览参数化的二
 - 使用 JSON 保存/加载项目
 - 带物理组的 Gmsh `.geo` 导出
 - 内嵌均匀或局部加密的网格尺寸设置
+- 输入值会自动保存在浏览器中（`localStorage`），下次访问时恢复；如需重新开始，请使用 `Reset to Defaults`
 - 无需安装、构建过程或 Web 服务器
 
 ## 快速开始
@@ -32,6 +33,23 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 如果使用 Gmsh 图形界面，请打开 `.geo` 文件，执行 `Mesh` → `2D`，然后通过 `File` → `Export` 保存网格。详情请参阅 [Gmsh GEO 导出](#gmsh-geo-导出)。
 
 使用默认参数生成的文件（`.geo`、项目 `.json`，以及 MSH 4.1 和 MSH 2.2 两种格式的 `.msh`）已附在每个[发布版本](https://github.com/sasekazu/ParaFin/releases)中。可从[最新发布版本](https://github.com/sasekazu/ParaFin/releases/latest)下载。
+
+## 预览操作
+
+两个预览面板（完整截面和指纹细节）都支持缩放和平移。
+
+| 操作 | 鼠标 / 触摸 | 键盘（面板获得焦点时） |
+|---|---|---|
+| 缩放 | 鼠标滚轮、双指捏合 | `+` / `-` |
+| 平移 | 拖动 | 方向键 |
+| 重置视图 | 双击 | `0` |
+| 保存为图片 | 各视图中的 `SVG` / `PNG` 按钮 | |
+
+在缩放或平移之前，每次修改参数或调整窗口大小时，各视图都会自动适配。缩放或平移之后将保持当前视图，双击视图（或按 `0` 键）可恢复自动适配。比例尺会随缩放级别变化。
+
+预览下方的 `Display` 复选框可隐藏 X/Y 坐标轴和指纹细节视图（设置会被记住）。`SVG` / `PNG` 按钮会将当前显示的视图（包含当前缩放、已显示的坐标轴和比例尺）以白色背景原样保存；PNG 为屏幕尺寸的两倍。
+
+通过页眉中的 `File name…` 按钮（可选）打开的输入框，可设置下载的 `.geo`、`.json` 和图片文件的基本名称（例如 `finger` → `finger.geo`、`finger.json`、`finger-cross-section.svg`）。留空则使用默认名称。也可以将 `.json` 文件拖放到页面上来加载项目；各参数旁的 `?` 按钮可显示简短说明。
 
 ## 参数
 
@@ -294,6 +312,17 @@ innerHeight = outerHeight - 2 × thickness
 - 指甲用椭圆形的背侧区域表示。
 - 指纹嵴线和真皮乳头使用采样的参数曲线，而非按解剖结构重建的曲面。
 - 导出的网格设置提供的是一种统一的加密方案，而不是针对不同组织的单元尺寸或边界层网格。
+
+## 开发
+
+```bash
+npm test          # API 测试和 geometry 一致性测试（仅需 Node，无依赖）
+npm run test:ui   # index.html 浏览器冒烟测试（需要 Playwright）
+```
+
+`js/geometry.js`（经典脚本，由 `index.html` 使用）和 `js/geometry-core.js`（ES 模块，由 npm 包使用）是同一算法的两份副本，因为 `index.html` 必须能从 `file://` 直接打开。`npm test` 会用有效和无效的参数集运行两者，结果不一致则失败，因此修改必须同时应用到两个文件。
+
+UI 测试需要 Playwright（它不是本包的依赖）：`npm install --no-save playwright && npx playwright install chromium`
 
 ## 参考文献
 
