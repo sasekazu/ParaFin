@@ -245,18 +245,29 @@
         <main class="preview-panel">
             <div class="preview-header">
                 <h2>Geometry Preview</h2>
+                <p class="preview-hint">Scroll to zoom &middot; drag to pan &middot; double-click to reset</p>
             </div>
             <div class="preview-views">
                 <div class="view-container main-view">
                     <h3 class="view-title">Cross Section (Full View)</h3>
-                    <div class="svg-container" id="mainViewContainer">
+                    <div class="svg-container" id="mainViewContainer" tabindex="0" role="group" aria-label="Cross section full view. Scroll or pinch to zoom, drag to pan, double-click or press 0 to reset.">
                         <svg id="mainSvg"></svg>
+                        <div class="view-tools">
+                            <button type="button" data-action="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+                            <button type="button" data-action="zoom-out" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
+                            <button type="button" data-action="reset" title="Reset view (double-click or 0)" aria-label="Reset view">Reset</button>
+                        </div>
                     </div>
                 </div>
                 <div class="view-container detail-view">
                     <h3 class="view-title">Fingerprint Detail (Magnified)</h3>
-                    <div class="svg-container" id="detailViewContainer">
+                    <div class="svg-container" id="detailViewContainer" tabindex="0" role="group" aria-label="Fingerprint detail magnified view. Scroll or pinch to zoom, drag to pan, double-click or press 0 to reset.">
                         <svg id="detailSvg"></svg>
+                        <div class="view-tools">
+                            <button type="button" data-action="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+                            <button type="button" data-action="zoom-out" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
+                            <button type="button" data-action="reset" title="Reset view (double-click or 0)" aria-label="Reset view">Reset</button>
+                        </div>
                     </div>
                 </div>
             </div>

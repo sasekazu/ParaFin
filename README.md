@@ -31,6 +31,18 @@ If you prefer the Gmsh GUI, open the `.geo` file, run `Mesh` → `2D`, and save 
 
 Files generated with the default parameters (`.geo`, project `.json`, and `.msh` in both MSH 4.1 and MSH 2.2 formats) are attached to each [release](https://github.com/sasekazu/ParaFin/releases). Download them from the [latest release](https://github.com/sasekazu/ParaFin/releases/latest).
 
+## Preview Controls
+
+Both preview panels (full cross section and fingerprint detail) can be zoomed and panned.
+
+| Action | Mouse / touch | Keyboard (panel focused) |
+|---|---|---|
+| Zoom | Mouse wheel, pinch, or the `+` / `−` buttons | `+` / `-` |
+| Pan | Drag | Arrow keys |
+| Reset view | Double-click or the `Reset` button | `0` |
+
+Until you zoom or pan, each view is fitted automatically when parameters change or the window is resized. Once you zoom or pan, your view is kept; use `Reset` to return to automatic fitting. The scale bar adapts to the zoom level.
+
 ## Parameters
 
 All geometric lengths are specified in millimeters and angles in degrees.

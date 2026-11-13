@@ -306,10 +306,8 @@
             elements[name].addEventListener('input', updateGeometry);
         });
 
-        // Window resize
-        window.addEventListener('resize', function() {
-            updateGeometry();
-        });
+        // Viewport resizes are handled by Renderer (ResizeObserver), which redraws
+        // the views without regenerating the geometry.
     }
 
     /**
