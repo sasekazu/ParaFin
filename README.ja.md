@@ -313,6 +313,17 @@ innerHeight = outerHeight - 2 × thickness
 - 指紋の隆線と真皮乳頭は、解剖学的に再構成された曲面ではなく、サンプリングされたパラメトリック曲線を用います。
 - エクスポートされるメッシュ設定は、組織ごとの要素サイズや境界層メッシュではなく、単一の共通の細分化方式を提供します。
 
+## 開発
+
+```bash
+npm test          # API テストと geometry 一致テスト（Node のみ、依存パッケージなし）
+npm run test:ui   # index.html のブラウザ簡易テスト（Playwright が必要）
+```
+
+`js/geometry.js`（クラシックスクリプト。`index.html` が使用）と `js/geometry-core.js`（ES モジュール。npm パッケージが使用）は、`index.html` を `file://` から開いても動作させるため、同じアルゴリズムのコピーとして保守されています。`npm test` は、有効・無効の両方のパラメータセットで両者を実行し、結果が異なれば失敗します。変更は両方のファイルに適用してください。
+
+UI テストには Playwright が必要です（このパッケージの依存関係ではありません）: `npm install --no-save playwright && npx playwright install chromium`
+
 ## 参考文献
 
 パラメータの表記と基本的な指先断面モデルは、次の文献に従っています。

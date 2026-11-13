@@ -313,6 +313,17 @@ innerHeight = outerHeight - 2 × thickness
 - 지문 융선과 진피 유두는 해부학적으로 재구성한 곡면이 아니라 샘플링된 매개변수 곡선을 사용합니다.
 - 내보낸 메시 설정은 조직별 요소 크기나 경계층 메시가 아니라, 하나의 공통 세분화 방식을 제공합니다.
 
+## 개발
+
+```bash
+npm test          # API 테스트와 geometry 일치 테스트 (Node만 필요, 의존성 없음)
+npm run test:ui   # index.html 브라우저 스모크 테스트 (Playwright 필요)
+```
+
+`js/geometry.js`(클래식 스크립트, `index.html`에서 사용)와 `js/geometry-core.js`(ES 모듈, npm 패키지에서 사용)는 `index.html`이 `file://`에서도 동작해야 하므로 동일한 알고리즘의 사본으로 관리됩니다. `npm test`는 유효/무효 매개변수 세트로 둘을 실행하여 결과가 다르면 실패하므로, 변경은 두 파일 모두에 적용해야 합니다.
+
+UI 테스트에는 Playwright가 필요합니다(이 패키지의 의존성이 아님): `npm install --no-save playwright && npx playwright install chromium`
+
 ## 참고 문헌
 
 매개변수 표기와 기본 손끝 단면 모델은 다음 문헌을 따릅니다.

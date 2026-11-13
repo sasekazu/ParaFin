@@ -326,6 +326,17 @@ Additional limitations:
 - Fingerprint ridges and dermal papillae use sampled parametric curves rather than anatomically reconstructed surfaces.
 - The exported mesh settings provide one shared refinement scheme rather than tissue-specific element sizes or boundary-layer meshes.
 
+## Development
+
+```bash
+npm test          # API test and geometry parity test (Node only, no dependencies)
+npm run test:ui   # browser smoke test of index.html (requires Playwright)
+```
+
+`js/geometry.js` (classic script, used by `index.html`) and `js/geometry-core.js` (ES module, used by the npm package) are maintained as copies of the same algorithms, because `index.html` must keep working from `file://`. `npm test` runs both over valid and invalid parameter sets and fails if their results differ, so a change must be applied to both files.
+
+The UI test needs Playwright, which is not a dependency of this package: `npm install --no-save playwright && npx playwright install chromium`.
+
 ## Reference
 
 Parameter notation and the basic fingertip cross-section model follow:

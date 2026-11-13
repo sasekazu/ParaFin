@@ -313,6 +313,17 @@ innerHeight = outerHeight - 2 × thickness
 - 指纹嵴线和真皮乳头使用采样的参数曲线，而非按解剖结构重建的曲面。
 - 导出的网格设置提供的是一种统一的加密方案，而不是针对不同组织的单元尺寸或边界层网格。
 
+## 开发
+
+```bash
+npm test          # API 测试和 geometry 一致性测试（仅需 Node，无依赖）
+npm run test:ui   # index.html 浏览器冒烟测试（需要 Playwright）
+```
+
+`js/geometry.js`（经典脚本，由 `index.html` 使用）和 `js/geometry-core.js`（ES 模块，由 npm 包使用）是同一算法的两份副本，因为 `index.html` 必须能从 `file://` 直接打开。`npm test` 会用有效和无效的参数集运行两者，结果不一致则失败，因此修改必须同时应用到两个文件。
+
+UI 测试需要 Playwright（它不是本包的依赖）：`npm install --no-save playwright && npx playwright install chromium`
+
 ## 参考文献
 
 参数符号和基本的指尖截面模型遵循：
