@@ -62,6 +62,7 @@
     };
     const SAVE_DELAY_MS = 300;
     let saveTimer = null;
+    let summaryOpen = false;
 
     // Mesh setting parameter names (numeric inputs; checkbox handled separately)
     const MESH_PARAM_NAMES = [
@@ -211,8 +212,8 @@
      * Clear all error messages and invalid markers; re-enable the download buttons
      */
     function clearErrors() {
-        elements.errorSummary.textContent = '';
         elements.errorSummary.style.display = 'none';
+        setSummaryOpen(false);
 
         allErrorFieldNames().forEach(name => {
             const errorElement = errorElementFor(name);
@@ -277,12 +278,59 @@
     }
 
     /**
+     * Build the error summary once: a chip that floats over the panel (it takes no
+     * layout space, so nothing below it moves) and a popover with the details.
+     */
+    function setupErrorSummary() {
+        const box = elements.errorSummary;
+        box.textContent = '';
+
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'error-chip';
+        chip.setAttribute('aria-expanded', 'false');
+        chip.setAttribute('aria-controls', 'errorPopover');
+        chip.addEventListener('click', () => setSummaryOpen(!summaryOpen));
+
+        const popover = document.createElement('div');
+        popover.className = 'error-popover';
+        popover.id = 'errorPopover';
+        popover.hidden = true;
+
+        box.appendChild(chip);
+        box.appendChild(popover);
+        elements.errorChip = chip;
+        elements.errorPopover = popover;
+
+        document.addEventListener('click', function(e) {
+            if (summaryOpen && !box.contains(e.target)) setSummaryOpen(false);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && summaryOpen) {
+                setSummaryOpen(false);
+                elements.errorChip.focus();
+            }
+        });
+    }
+
+    function setSummaryOpen(open) {
+        summaryOpen = open;
+        elements.errorPopover.hidden = !open;
+        elements.errorChip.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    /**
      * Show a plain message in the error summary (e.g. project load failure)
      */
     function showSummaryMessage(message) {
         clearErrors();
-        elements.errorSummary.textContent = message;
+        elements.errorChip.textContent = '\u26A0 Error';
+        elements.errorPopover.textContent = '';
+        const p = document.createElement('p');
+        p.textContent = message;
+        elements.errorPopover.appendChild(p);
         elements.errorSummary.style.display = 'block';
+        setSummaryOpen(true);
     }
 
     /**
@@ -290,18 +338,18 @@
      * @param {Object} errors - Error messages keyed by parameter name
      */
     function displayErrors(errors) {
+        const wasOpen = summaryOpen;   // keep the popover open while the user edits
         clearErrors();
 
         const names = allErrorFieldNames().filter(name => errors[name]);
         if (names.length === 0) return;
 
-        // Summary: count plus one jump link per error, in form order
-        const summary = elements.errorSummary;
-        summary.textContent = '';
-        const heading = document.createElement('div');
-        heading.textContent = `${names.length} validation error${names.length > 1 ? 's' : ''} found`;
-        summary.appendChild(heading);
-
+        // Summary chip + popover: one jump link per error, in form order
+        const keepOpen = wasOpen;
+        elements.errorChip.textContent =
+            `\u26A0 ${names.length} error${names.length > 1 ? 's' : ''}`;
+        const popover = elements.errorPopover;
+        popover.textContent = '';
         const list = document.createElement('ul');
         list.className = 'error-summary-list';
         names.forEach(name => {
@@ -310,13 +358,17 @@
             link.type = 'button';
             link.className = 'error-link';
             link.textContent = labelFor(name);
-            link.addEventListener('click', () => focusField(name));
+            link.addEventListener('click', () => {
+                setSummaryOpen(false);
+                focusField(name);
+            });
             li.appendChild(link);
             li.appendChild(document.createTextNode(': ' + errors[name]));
             list.appendChild(li);
         });
-        summary.appendChild(list);
-        summary.style.display = 'block';
+        popover.appendChild(list);
+        elements.errorSummary.style.display = 'block';
+        setSummaryOpen(keepOpen);
 
         // Per-field messages and markers
         names.forEach(name => {
@@ -618,6 +670,7 @@
      */
     function initialize() {
         initializeElements();
+        setupErrorSummary();
         
         // Initialize renderer with both SVG elements
         const mainSvg = document.getElementById('mainSvg');
