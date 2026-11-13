@@ -294,8 +294,34 @@ const Renderer = (function() {
                 lastDist = c.dist;
             }
         }
-        el.addEventListener('pointerup', endPointer);
-        el.addEventListener('pointercancel', endPointer);
+        // Double-tap resets the view on touch screens (dblclick is unreliable there).
+        // A tap = single finger, little movement, short press.
+        let tapStart = null;
+        let gestureFingers = 0;
+        let lastTap = null;
+        el.addEventListener('pointerdown', function(e) {
+            if (e.pointerType !== 'touch' || e.target.closest('.view-tools')) return;
+            gestureFingers = Math.max(pointers.size, gestureFingers);
+            if (pointers.size === 1) {
+                tapStart = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+            }
+        });
+        function detectDoubleTap(e) {
+            if (e.pointerType !== 'touch' || !tapStart) return;
+            const wasTap = gestureFingers <= 1 && e.timeStamp - tapStart.t < 300 &&
+                Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 10;
+            if (pointers.size <= 1) { tapStart = null; gestureFingers = 0; }
+            if (!wasTap) { lastTap = null; return; }
+            if (lastTap && e.timeStamp - lastTap.t < 350 &&
+                Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 30) {
+                lastTap = null;
+                resetView(isDetail);
+            } else {
+                lastTap = { x: e.clientX, y: e.clientY, t: e.timeStamp };
+            }
+        }
+        el.addEventListener('pointerup', function(e) { detectDoubleTap(e); endPointer(e); });
+        el.addEventListener('pointercancel', function(e) { tapStart = null; gestureFingers = 0; endPointer(e); });
 
         el.addEventListener('dblclick', function(e) {
             if (e.target.closest('.view-tools')) return;
