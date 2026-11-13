@@ -69,10 +69,10 @@ header .subtitle {
 
 /* Parameters panel (left) */
 .parameters-panel {
-    width: 380px;
+    width: 320px;
     flex-shrink: 0;
     background-color: white;
-    padding: 1.5rem;
+    padding: 1.5rem 1rem;
     overflow-y: auto;
     border-right: 1px solid #ddd;
     box-shadow: 2px 0 4px rgba(0,0,0,0.05);
@@ -237,8 +237,8 @@ header .subtitle {
 /* Parameter groups */
 .param-group {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 4.5rem;
-    column-gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr) 2.8rem;
+    column-gap: 0.6rem;
     align-items: center;
     margin-bottom: 0.9rem;
 }
@@ -318,10 +318,11 @@ header .subtitle {
 
 .param-group input[type="number"] {
     width: 100%;
-    padding: 0.5rem;
+    padding: 0.5rem 0.25rem;
     border: 1px solid #ddd;
     border-radius: 4px;
-    font-size: 0.875rem;
+    font-size: 0.8rem;
+    text-align: center;
     margin-bottom: 0;
     transition: border-color 0.2s;
 }
