@@ -15,6 +15,7 @@ ParaFin is a browser-based tool for generating and previewing parametric 2D fing
 - Project save/load using JSON
 - Gmsh `.geo` export with physical groups
 - Embedded uniform or locally refined mesh-size settings
+- Inputs are saved automatically in the browser (`localStorage`) and restored on the next visit; use `Reset to Defaults` to start over
 - No installation, build process, or web server required
 
 ## Quick Start

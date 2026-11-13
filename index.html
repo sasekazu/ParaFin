@@ -14,7 +14,7 @@
     <div class="container">
         <!-- Left Panel: Parameters -->
         <aside class="parameters-panel">
-            <div class="error-summary" id="errorSummary"></div>
+            <div class="error-summary" id="errorSummary" role="alert"></div>
 
             <!-- Finger Section -->
             <section class="param-section">
@@ -234,6 +234,7 @@
 
             <!-- Action Buttons -->
             <div class="actions">
+                <p class="actions-hint" id="actionsHint" role="status" style="display: none;"></p>
                 <button id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
                 <button id="loadProjectButton" class="btn btn-secondary">Load Project</button>
                 <button id="downloadButton" class="btn btn-primary">Download JSON</button>

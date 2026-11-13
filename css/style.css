@@ -306,6 +306,10 @@ header .subtitle {
 
 /* Error messages */
 .error-summary {
+    position: sticky;
+    top: -1.5rem;
+    z-index: 2;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
     display: none;
     background-color: #fee;
     border: 1px solid #fcc;
@@ -315,6 +319,42 @@ header .subtitle {
     margin-bottom: 1rem;
     font-size: 0.875rem;
     font-weight: 500;
+}
+
+.error-summary-list {
+    margin: 0.4rem 0 0;
+    padding-left: 1.1rem;
+    font-weight: 400;
+}
+
+.error-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-weight: 600;
+    color: #a22;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.error-link:hover {
+    color: #711;
+}
+
+.error-link:focus-visible {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
+.param-group input.invalid {
+    border-color: #c33;
+    background-color: #fff8f8;
+}
+
+.actions-hint {
+    font-size: 0.8rem;
+    color: #c33;
 }
 
 .error-message {

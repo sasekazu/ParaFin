@@ -147,8 +147,9 @@ const Renderer = (function() {
         if (!(v.w > 0 && v.h > 0) || !params) return null;
 
         if (isDetail) {
-            const focusW = Math.min(params.fingerWidth * 0.6, 8);
-            const focusH = Math.min(params.fingerHeight * 0.3, 4);
+            // Guard against invalid (zero/negative) sizes while the user is typing
+            const focusW = Math.max(Math.min(params.fingerWidth * 0.6, 8), 0.5);
+            const focusH = Math.max(Math.min(params.fingerHeight * 0.3, 4), 0.5);
             const scale = Math.min((v.w - 2 * MARGIN) / focusW, (v.h - 2 * MARGIN) / focusH);
             const apexY = -params.fingerHeight / 2;
             return { scale: scale, cx: 0, cy: apexY + 0.2 * v.h / scale };

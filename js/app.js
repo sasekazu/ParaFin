@@ -8,6 +8,7 @@
  * - Validation error display
  * - Geometry regeneration and rendering
  * - Reset and export functionality
+ * - Auto-saving the inputs to localStorage and restoring them on start
  */
 
 (function() {
@@ -29,6 +30,10 @@
         'epidermisDermisAngularExtent', 'epidermisDermisWavelength', 'epidermisDermisHeight'
     ];
 
+
+    const STORAGE_KEY = 'parafin.project.v1';
+    const SAVE_DELAY_MS = 300;
+    let saveTimer = null;
 
     // Mesh setting parameter names (numeric inputs; checkbox handled separately)
     const MESH_PARAM_NAMES = [
@@ -61,6 +66,35 @@
         elements.downloadButton = document.getElementById('downloadButton');
         elements.downloadGeoButton = document.getElementById('downloadGeoButton');
         elements.legend = document.getElementById('legend');
+        elements.actionsHint = document.getElementById('actionsHint');
+    }
+
+    /**
+     * Save valid parameters to localStorage (debounced). Storage may be unavailable
+     * (private mode, blocked site data), so every access is wrapped in try/catch.
+     * The stored text is the same project JSON used by "Download JSON".
+     * @param {Object} params - Valid parameter object
+     */
+    function scheduleSave(params) {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(function() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(Exporter.generateJSON(params)));
+            } catch (e) { /* ignore: persistence is a convenience only */ }
+        }, SAVE_DELAY_MS);
+    }
+
+    /**
+     * Load previously saved parameters.
+     * @returns {Object|null} Validated parameters, or null if none/invalid
+     */
+    function loadSavedParameters() {
+        try {
+            const text = localStorage.getItem(STORAGE_KEY);
+            return text ? Exporter.importProjectFromText(text) : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     /**
@@ -114,27 +148,89 @@
     }
 
     /**
-     * Clear all error messages
+     * All input ids that can carry a validation error
+     */
+    function allErrorFieldNames() {
+        return PARAM_DEFINITIONS.concat(MESH_PARAM_NAMES);
+    }
+
+    function errorElementFor(name) {
+        return elements['error' + name.charAt(0).toUpperCase() + name.slice(1)];
+    }
+
+    /**
+     * Clear all error messages and invalid markers; re-enable the download buttons
      */
     function clearErrors() {
         elements.errorSummary.textContent = '';
         elements.errorSummary.style.display = 'none';
-        
-        PARAM_DEFINITIONS.forEach(param => {
-            const errorElement = elements['error' + param.charAt(0).toUpperCase() + param.slice(1)];
+
+        allErrorFieldNames().forEach(name => {
+            const errorElement = errorElementFor(name);
             if (errorElement) {
                 errorElement.textContent = '';
                 errorElement.style.display = 'none';
+            }
+            const input = elements[name];
+            if (input) {
+                input.classList.remove('invalid');
+                input.removeAttribute('aria-invalid');
+                input.removeAttribute('aria-describedby');
             }
         });
 
-        MESH_PARAM_NAMES.forEach(name => {
-            const errorElement = elements['error' + name.charAt(0).toUpperCase() + name.slice(1)];
-            if (errorElement) {
-                errorElement.textContent = '';
-                errorElement.style.display = 'none';
-            }
+        setDownloadsEnabled(true, 0);
+    }
+
+    /**
+     * Enable/disable the download buttons and explain why when disabled
+     * @param {boolean} enabled
+     * @param {number} errorCount
+     */
+    function setDownloadsEnabled(enabled, errorCount) {
+        const reason = 'Fix the ' + errorCount + ' input error' + (errorCount > 1 ? 's' : '') +
+            ' shown in the left panel to enable downloads.';
+        [elements.downloadButton, elements.downloadGeoButton].forEach(btn => {
+            btn.disabled = !enabled;
+            if (enabled) btn.removeAttribute('title');
+            else btn.title = reason;
         });
+        elements.actionsHint.textContent = enabled ? '' : reason;
+        elements.actionsHint.style.display = enabled ? 'none' : 'block';
+    }
+
+    /**
+     * Human-readable name of a parameter, taken from its <label>
+     */
+    function labelFor(name) {
+        const el = document.querySelector('label[for="' + name + '"] .parameter-name');
+        return el ? el.textContent : name;
+    }
+
+    /**
+     * Move focus to an input, expanding its collapsible section if needed
+     */
+    function focusField(name) {
+        const input = elements[name];
+        if (!input) return;
+        const section = input.closest('.param-section.collapsible');
+        if (section && section.classList.contains('collapsed')) {
+            section.classList.remove('collapsed');
+            const toggle = section.querySelector('.section-toggle');
+            if (toggle) toggle.setAttribute('aria-expanded', 'true');
+        }
+        input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        input.focus({ preventScroll: true });
+        input.select();
+    }
+
+    /**
+     * Show a plain message in the error summary (e.g. project load failure)
+     */
+    function showSummaryMessage(message) {
+        clearErrors();
+        elements.errorSummary.textContent = message;
+        elements.errorSummary.style.display = 'block';
     }
 
     /**
@@ -144,25 +240,46 @@
     function displayErrors(errors) {
         clearErrors();
 
-        const errorCount = Object.keys(errors).length;
-        if (errorCount === 0) return;
+        const names = allErrorFieldNames().filter(name => errors[name]);
+        if (names.length === 0) return;
 
-        // Show summary
-        elements.errorSummary.textContent = `${errorCount} validation error${errorCount > 1 ? 's' : ''} found`;
-        elements.errorSummary.style.display = 'block';
+        // Summary: count plus one jump link per error, in form order
+        const summary = elements.errorSummary;
+        summary.textContent = '';
+        const heading = document.createElement('div');
+        heading.textContent = `${names.length} validation error${names.length > 1 ? 's' : ''} found`;
+        summary.appendChild(heading);
 
-        // Show individual errors
-        for (const param in errors) {
-            const errorElement = elements['error' + param.charAt(0).toUpperCase() + param.slice(1)];
+        const list = document.createElement('ul');
+        list.className = 'error-summary-list';
+        names.forEach(name => {
+            const li = document.createElement('li');
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'error-link';
+            link.textContent = labelFor(name);
+            link.addEventListener('click', () => focusField(name));
+            li.appendChild(link);
+            li.appendChild(document.createTextNode(': ' + errors[name]));
+            list.appendChild(li);
+        });
+        summary.appendChild(list);
+        summary.style.display = 'block';
+
+        // Per-field messages and markers
+        names.forEach(name => {
+            const errorElement = errorElementFor(name);
             if (errorElement) {
-                errorElement.textContent = errors[param];
+                errorElement.textContent = errors[name];
                 errorElement.style.display = 'block';
             }
-        }
+            const input = elements[name];
+            input.classList.add('invalid');
+            input.setAttribute('aria-invalid', 'true');
+            if (errorElement && errorElement.id) input.setAttribute('aria-describedby', errorElement.id);
+        });
 
-        // Disable download buttons
-        elements.downloadButton.disabled = true;
-        elements.downloadGeoButton.disabled = true;
+        setDownloadsEnabled(false, names.length);
     }
 
     /**
@@ -181,8 +298,7 @@
 
         if (allValid) {
             clearErrors();
-            elements.downloadButton.disabled = false;
-            elements.downloadGeoButton.disabled = false;
+            scheduleSave(currentParams);
 
             // Generate geometry
             const geometry = Geometry.generateGeometry(currentParams);
@@ -266,9 +382,7 @@
                         setParameters(importedParams);
                         updateGeometry();
                     } catch (err) {
-                        clearErrors();
-                        elements.errorSummary.textContent = 'Failed to load project: ' + err.message;
-                        elements.errorSummary.style.display = 'block';
+                        showSummaryMessage('Failed to load project: ' + err.message);
                     }
                 });
                 reader.readAsText(file);
@@ -325,8 +439,8 @@
         Renderer.initialize(mainSvg, mainContainer, detailSvg, detailContainer);
 
         // Set default parameters
-        const defaultParams = Geometry.getDefaultParameters();
-        setParameters(defaultParams);
+        // Restore the last valid inputs from the previous session, else defaults
+        setParameters(loadSavedParameters() || Geometry.getDefaultParameters());
 
         // Setup event listeners
         setupEventListeners();
