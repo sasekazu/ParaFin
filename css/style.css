@@ -559,7 +559,8 @@ header .subtitle {
 
 /* Legend */
 .legend {
-    margin-top: 1rem;
+    flex: 1;
+    min-width: 0;
     padding: 1rem;
     background-color: #fafafa;
     border: 1px solid #ddd;
@@ -806,4 +807,42 @@ body.drag-active::after {
 .param-group input[type="number"]::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
+}
+
+/* Legend + display options row under the preview */
+.preview-footer {
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.view-options {
+    flex: none;
+    margin: 0;
+    padding: 0.5rem 1rem 0.75rem;
+    background-color: #fafafa;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.view-options legend {
+    padding: 0 0.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.view-options label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.view-container[hidden] {
+    display: none;
 }

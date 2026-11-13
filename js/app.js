@@ -35,6 +35,7 @@
 
     const STORAGE_KEY = 'parafin.project.v1';
     const FILENAME_KEY = 'parafin.fileName';
+    const VIEW_OPTIONS_KEY = 'parafin.viewOptions';
     const MAX_PROJECT_FILE_BYTES = 5 * 1024 * 1024;
 
     // Short explanations shown by the "?" button next to each parameter
@@ -98,6 +99,8 @@
         elements.actionsHint = document.getElementById('actionsHint');
         elements.exportFileName = document.getElementById('exportFileName');
         elements.fileNameToggle = document.getElementById('fileNameToggle');
+        elements.showAxes = document.getElementById('showAxes');
+        elements.showDetail = document.getElementById('showDetail');
         elements.fileNamePopover = document.getElementById('fileNamePopover');
     }
 
@@ -526,6 +529,43 @@
     }
 
     /**
+     * Preview display options: X/Y axes (also in saved images) and the fingerprint
+     * detail view. Remembered between visits.
+     */
+    function setupViewOptions() {
+        const detailView = document.querySelector('.detail-view');
+
+        function apply() {
+            Renderer.setShowAxes(elements.showAxes.checked);
+            detailView.hidden = !elements.showDetail.checked;
+            // The main view is resized by the layout (ResizeObserver); the detail view
+            // needs an explicit redraw when it becomes visible again.
+            requestAnimationFrame(function() { Renderer.refresh(); });
+        }
+        function save() {
+            try {
+                localStorage.setItem(VIEW_OPTIONS_KEY, JSON.stringify({
+                    axes: elements.showAxes.checked,
+                    detail: elements.showDetail.checked
+                }));
+            } catch (e) { /* ignore */ }
+        }
+
+        try {
+            const saved = JSON.parse(localStorage.getItem(VIEW_OPTIONS_KEY) || 'null');
+            if (saved) {
+                elements.showAxes.checked = saved.axes !== false;
+                elements.showDetail.checked = saved.detail !== false;
+            }
+        } catch (e) { /* ignore */ }
+
+        [elements.showAxes, elements.showDetail].forEach(box => {
+            box.addEventListener('change', function() { apply(); save(); });
+        });
+        apply();
+    }
+
+    /**
      * Header "File name..." button that opens a small popover with the name field
      */
     function setupFileNameMenu() {
@@ -730,6 +770,7 @@
         setupHelp();
         setupColorDots();
         setupFileNameMenu();
+        setupViewOptions();
 
         // Mesh settings inputs
         MESH_PARAM_NAMES.forEach(name => {

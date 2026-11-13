@@ -49,6 +49,9 @@ const Renderer = (function() {
     let detailOffsetX = 0;
     let detailOffsetY = 0;
 
+    // Display options (also applied to saved SVG/PNG images)
+    let showAxes = true;
+
     // Most recent geometry (kept so views can be redrawn without regenerating it)
     let lastGeometry = null;
     let lastParams = null;
@@ -646,13 +649,18 @@ const Renderer = (function() {
      */
     function drawAxes(params, isDetail = false) {
         const v = getView(isDetail);
+        if (!v.svg) return;
+
+        if (showAxes) {
+            drawAxisLines(v, modelToScreen(0, 0, isDetail));
+        }
+        drawScaleBar(v);
+    }
+
+    function drawAxisLines(v, origin) {
         const svg = v.svg;
-        if (!svg) return;
-
         const W = v.w, H = v.h;
-        const origin = modelToScreen(0, 0, isDetail);
         const clamp = (x, lo, hi) => Math.min(Math.max(x, lo), hi);
-
         const g = document.createElementNS(SVG_NS, 'g');
         g.setAttribute('class', 'axes');
         const lineAttrs = { stroke: '#666', 'stroke-width': 1, 'stroke-dasharray': '4,2' };
@@ -673,6 +681,11 @@ const Renderer = (function() {
         g.appendChild(yLabel);
 
         svg.appendChild(g);
+    }
+
+    function drawScaleBar(v) {
+        const svg = v.svg;
+        const W = v.w, H = v.h;
 
         // Scale bar - fixed position at bottom-center, length adapts to the zoom level
         const scaleGroup = document.createElementNS(SVG_NS, 'g');
@@ -801,12 +814,32 @@ const Renderer = (function() {
         return { markup: markup, width: v.w, height: v.h };
     }
 
+    /**
+     * Show or hide the X/Y axes (applies to the previews and to saved images)
+     * @param {boolean} visible
+     */
+    function setShowAxes(visible) {
+        showAxes = !!visible;
+        renderView(false);
+        renderView(true);
+    }
+
+    /**
+     * Redraw both views, e.g. after a view was shown again
+     */
+    function refresh() {
+        renderView(false);
+        renderView(true);
+    }
+
     // Public API
     return {
         initialize,
         render,
         updateLegend,
         resetView,
-        getSvgMarkup
+        getSvgMarkup,
+        setShowAxes,
+        refresh
     };
 })();

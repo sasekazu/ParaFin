@@ -45,7 +45,7 @@ Both preview panels (full cross section and fingerprint detail) can be zoomed an
 
 Until you zoom or pan, each view is fitted automatically when parameters change or the window is resized. Once you zoom or pan, your view is kept; double-click the view (or press `0`) to return to automatic fitting. The scale bar adapts to the zoom level.
 
-The `SVG` and `PNG` buttons save the view exactly as shown (including the current zoom, axes and scale bar) on a white background; PNG files are saved at twice the on-screen size.
+The `Display` checkboxes under the preview hide the X/Y axes and the fingerprint detail view; both choices are remembered. The `SVG` and `PNG` buttons save the view exactly as shown (including the current zoom and, if enabled, the axes, plus the scale bar) on a white background; PNG files are saved at twice the on-screen size.
 
 The optional `File name…` button in the header opens a field that sets the base name of downloaded `.geo`, `.json` and image files (e.g. `finger` → `finger.geo`, `finger.json`, `finger-cross-section.svg`). Leave it empty for the default names. You can also load a project by dropping a `.json` file onto the page, and the `?` buttons next to each parameter show a short explanation.
 

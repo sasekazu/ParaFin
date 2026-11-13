@@ -219,6 +219,40 @@ await check('dropping a project file loads it; a bad file shows an error', async
     assert.match(await page.textContent('#errorPopover'), /Failed to load project/);
 });
 
+await check('axes checkbox toggles the axes in the preview and in saved SVG', async () => {
+    assert.ok(await page.locator('#mainSvg .axes').count() > 0);
+    await page.uncheck('#showAxes');
+    await settle();
+    assert.equal(await page.locator('#mainSvg .axes').count(), 0);
+    assert.equal(await page.locator('#detailSvg .axes').count(), 0);
+    assert.ok(await page.locator('#mainSvg .scale-indicator').count() > 0, 'scale bar should stay');
+    const off = fs.readFileSync((await download('#mainViewContainer [data-action=save-svg]')).file, 'utf8');
+    assert.ok(!off.includes('class="axes"'), 'saved SVG still has axes');
+    await page.check('#showAxes');
+    await settle();
+    const on = fs.readFileSync((await download('#mainViewContainer [data-action=save-svg]')).file, 'utf8');
+    assert.ok(on.includes('class="axes"'), 'saved SVG lost axes');
+});
+
+await check('fingerprint detail can be hidden; the choice is remembered', async () => {
+    const before = await rect('#mainViewContainer');
+    await page.uncheck('#showDetail');
+    await settle(300);
+    assert.ok(await page.isHidden('.detail-view'));
+    const wider = await rect('#mainViewContainer');
+    assert.ok(wider.right - wider.left > (before.right - before.left) * 1.5, 'main view did not expand');
+    const g = await drawnBounds('main');
+    assert.ok(g.left >= wider.left && g.right <= wider.right, 'main view not re-fitted');
+    await page.reload();
+    await settle(400);
+    assert.ok(await page.isHidden('.detail-view'));
+    assert.equal(await page.isChecked('#showDetail'), false);
+    await page.check('#showDetail');
+    await settle(300);
+    assert.ok(await page.isVisible('.detail-view'));
+    assert.ok(await page.locator('#detailSvg path').count() > 0, 'detail view not redrawn');
+});
+
 await check('no uncaught page errors', async () => {
     assert.deepEqual(pageErrors, []);
 });
