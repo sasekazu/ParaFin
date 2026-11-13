@@ -49,7 +49,7 @@ gmsh parafin-model.geo -2 -o parafin-model.msh
 
 `SVG` / `PNG` 按钮会将当前显示的视图（包含当前缩放、坐标轴和比例尺）以白色背景原样保存；PNG 为屏幕尺寸的两倍。
 
-可选的 `File name` 字段用于设置下载的 `.geo`、`.json` 和图片文件的基本名称（例如 `finger` → `finger.geo`、`finger.json`、`finger-cross-section.svg`）。留空则使用默认名称。也可以将 `.json` 文件拖放到页面上来加载项目；各参数旁的 `?` 按钮可显示简短说明。
+通过页眉中的 `File name…` 按钮（可选）打开的输入框，可设置下载的 `.geo`、`.json` 和图片文件的基本名称（例如 `finger` → `finger.geo`、`finger.json`、`finger-cross-section.svg`）。留空则使用默认名称。也可以将 `.json` 文件拖放到页面上来加载项目；各参数旁的 `?` 按钮可显示简短说明。
 
 ## 参数
 

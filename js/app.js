@@ -97,6 +97,8 @@
         elements.legend = document.getElementById('legend');
         elements.actionsHint = document.getElementById('actionsHint');
         elements.exportFileName = document.getElementById('exportFileName');
+        elements.fileNameToggle = document.getElementById('fileNameToggle');
+        elements.fileNamePopover = document.getElementById('fileNamePopover');
     }
 
     /**
@@ -524,6 +526,76 @@
     }
 
     /**
+     * Header "File name..." button that opens a small popover with the name field
+     */
+    function setupFileNameMenu() {
+        const toggle = elements.fileNameToggle;
+        const popover = elements.fileNamePopover;
+
+        function setOpen(open) {
+            popover.hidden = !open;
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) elements.exportFileName.focus();
+        }
+        function refreshLabel() {
+            const name = exportBaseName();
+            toggle.textContent = name ? 'File: ' + (name.length > 16 ? name.slice(0, 15) + '\u2026' : name) : 'File name\u2026';
+        }
+
+        toggle.addEventListener('click', () => setOpen(popover.hidden));
+        document.addEventListener('click', function(e) {
+            if (!popover.hidden && !popover.contains(e.target) && e.target !== toggle) setOpen(false);
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && !popover.hidden) {
+                setOpen(false);
+                toggle.focus();
+            }
+        });
+        elements.exportFileName.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') { setOpen(false); toggle.focus(); }
+        });
+        elements.exportFileName.addEventListener('input', refreshLabel);
+        refreshLabel();
+    }
+
+    // Tissue each parameter belongs to (colours match the legend and preview)
+    const PARAM_TISSUE = {
+        fingerWidth: 'stratum-corneum', fingerHeight: 'stratum-corneum',
+        stratumCorneumThickness: 'stratum-corneum',
+        epidermisThickness: 'epidermis',
+        dermisThickness: 'dermis',
+        boneWidth: 'bone', boneHeight: 'bone', boneOffsetY: 'bone',
+        nailAngularExtent: 'nail',
+        fingerprintAngularExtent: 'stratum-corneum', fingerprintWavelength: 'stratum-corneum',
+        fingerprintRidgeHeight: 'stratum-corneum',
+        epidermisDermisAngularExtent: 'dermis', epidermisDermisWavelength: 'dermis',
+        epidermisDermisHeight: 'dermis'
+    };
+    const TISSUE_NAMES = {
+        'stratum-corneum': 'Stratum corneum', 'epidermis': 'Epidermis', 'dermis': 'Dermis',
+        'bone': 'Bone', 'nail': 'Nail'
+    };
+
+    /**
+     * Add a coloured dot to each parameter label so it can be matched to the legend
+     */
+    function setupColorDots() {
+        const colors = (Geometry && Geometry.TISSUE_COLORS) || {};
+        Object.keys(PARAM_TISSUE).forEach(name => {
+            const label = document.querySelector('label[for="' + name + '"]');
+            const tissue = PARAM_TISSUE[name];
+            if (!label || !colors[tissue]) return;
+            const dot = document.createElement('span');
+            dot.className = 'color-dot';
+            dot.style.backgroundColor = colors[tissue];
+            dot.title = TISSUE_NAMES[tissue];
+            dot.setAttribute('aria-hidden', 'true');
+            label.insertBefore(dot, label.firstChild);
+        });
+    }
+
+    /**
      * Add a "?" button with an inline explanation to each parameter
      */
     function setupHelp() {
@@ -551,7 +623,8 @@
                 button.setAttribute('aria-expanded', text.hidden ? 'false' : 'true');
             });
 
-            label.appendChild(button);
+            // First child + float: the button stays at the top-right of the label even when it wraps
+            label.insertBefore(button, label.firstChild);
             label.insertAdjacentElement('afterend', text);
         });
     }
@@ -655,6 +728,8 @@
         });
 
         setupHelp();
+        setupColorDots();
+        setupFileNameMenu();
 
         // Mesh settings inputs
         MESH_PARAM_NAMES.forEach(name => {

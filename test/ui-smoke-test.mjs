@@ -180,10 +180,14 @@ await check('valid inputs survive a reload; invalid ones are not saved', async (
 await check('downloads use default and custom file names', async () => {
     assert.equal((await download('#downloadButton')).name, 'parafin-project.json');
     assert.equal((await download('#downloadGeoButton')).name, 'parafin-model.geo');
+    await page.click('#fileNameToggle');
     await page.fill('#exportFileName', 'my:finger/01');
+    await page.keyboard.press('Escape');
     assert.equal((await download('#downloadButton')).name, 'my_finger_01.json');
     assert.equal((await download('#downloadGeoButton')).name, 'my_finger_01.geo');
+    await page.click('#fileNameToggle');
     await page.fill('#exportFileName', '');
+    await page.keyboard.press('Escape');
 });
 
 await check('SVG and PNG exports are valid files', async () => {

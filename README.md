@@ -47,7 +47,7 @@ Until you zoom or pan, each view is fitted automatically when parameters change 
 
 The `SVG` and `PNG` buttons save the view exactly as shown (including the current zoom, axes and scale bar) on a white background; PNG files are saved at twice the on-screen size.
 
-The optional `File name` field sets the base name of downloaded `.geo`, `.json` and image files (e.g. `finger` → `finger.geo`, `finger.json`, `finger-cross-section.svg`). Leave it empty for the default names. You can also load a project by dropping a `.json` file onto the page, and the `?` buttons next to each parameter show a short explanation.
+The optional `File name…` button in the header opens a field that sets the base name of downloaded `.geo`, `.json` and image files (e.g. `finger` → `finger.geo`, `finger.json`, `finger-cross-section.svg`). Leave it empty for the default names. You can also load a project by dropping a `.json` file onto the page, and the `?` buttons next to each parameter show a short explanation.
 
 ## Parameters
 
