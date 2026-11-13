@@ -38,12 +38,12 @@ Both preview panels (full cross section and fingerprint detail) can be zoomed an
 
 | Action | Mouse / touch | Keyboard (panel focused) |
 |---|---|---|
-| Zoom | Mouse wheel, pinch, or the `+` / `−` buttons | `+` / `-` |
+| Zoom | Mouse wheel or pinch | `+` / `-` |
 | Pan | Drag | Arrow keys |
-| Reset view | Double-click or the `Reset` button | `0` |
+| Reset view | Double-click | `0` |
 | Save image | `SVG` / `PNG` buttons in each view | |
 
-Until you zoom or pan, each view is fitted automatically when parameters change or the window is resized. Once you zoom or pan, your view is kept; use `Reset` to return to automatic fitting. The scale bar adapts to the zoom level.
+Until you zoom or pan, each view is fitted automatically when parameters change or the window is resized. Once you zoom or pan, your view is kept; double-click the view (or press `0`) to return to automatic fitting. The scale bar adapts to the zoom level.
 
 The `SVG` and `PNG` buttons save the view exactly as shown (including the current zoom, axes and scale bar) on a white background; PNG files are saved at twice the on-screen size.
 

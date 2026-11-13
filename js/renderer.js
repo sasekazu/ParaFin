@@ -57,7 +57,7 @@ const Renderer = (function() {
     const MARGIN = 40;          // Margin around geometry in pixels
     const MIN_ZOOM = 0.2;       // Relative to the automatic scale
     const MAX_ZOOM = 50;
-    const BUTTON_ZOOM = 1.25;
+    const KEY_ZOOM = 1.25;
     const KEY_PAN_PX = 40;
     const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -304,8 +304,8 @@ const Renderer = (function() {
             const cx = v.w / 2, cy = v.h / 2;
             let handled = true;
             switch (e.key) {
-                case '+': case '=': zoomAt(v, isDetail, cx, cy, BUTTON_ZOOM); break;
-                case '-': case '_': zoomAt(v, isDetail, cx, cy, 1 / BUTTON_ZOOM); break;
+                case '+': case '=': zoomAt(v, isDetail, cx, cy, KEY_ZOOM); break;
+                case '-': case '_': zoomAt(v, isDetail, cx, cy, 1 / KEY_ZOOM); break;
                 case '0': resetView(isDetail); break;
                 case 'ArrowLeft':  panBy(v, isDetail,  KEY_PAN_PX, 0); break;
                 case 'ArrowRight': panBy(v, isDetail, -KEY_PAN_PX, 0); break;
@@ -314,15 +314,6 @@ const Renderer = (function() {
                 default: handled = false;
             }
             if (handled) e.preventDefault();
-        });
-
-        el.querySelectorAll('.view-tools [data-action]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                const action = btn.getAttribute('data-action');
-                if (action === 'zoom-in') zoomAt(v, isDetail, v.w / 2, v.h / 2, BUTTON_ZOOM);
-                else if (action === 'zoom-out') zoomAt(v, isDetail, v.w / 2, v.h / 2, 1 / BUTTON_ZOOM);
-                else if (action === 'reset') resetView(isDetail);
-            });
         });
     }
 
