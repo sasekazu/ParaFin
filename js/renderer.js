@@ -676,7 +676,7 @@ const Renderer = (function() {
         g.appendChild(xLabel);
 
         const yLabel = svgEl('text', {
-            x: clamp(origin.x + 5, 5, W - 210), y: 16, fill: '#666', 'font-size': 12
+            x: clamp(origin.x + 5, 5, W - 290), y: 16, fill: '#666', 'font-size': 12
         });
         yLabel.textContent = 'Y (dorsal)';
         g.appendChild(yLabel);
@@ -783,11 +783,39 @@ const Renderer = (function() {
         legendElement.appendChild(list);
     }
 
+    /**
+     * Serialize a view as a standalone SVG document (what is currently shown,
+     * including axes and scale bar, on a white background).
+     * @param {boolean} isDetail - Whether to export the detail view
+     * @returns {{markup: string, width: number, height: number}|null}
+     */
+    function getSvgMarkup(isDetail) {
+        const v = getView(isDetail);
+        if (!lastGeometry || !v.svg) return null;
+        renderView(isDetail);   // make sure pending changes are drawn
+        if (!(v.w > 0 && v.h > 0)) return null;
+
+        const clone = v.svg.cloneNode(true);
+        clone.setAttribute('xmlns', SVG_NS);
+        clone.setAttribute('width', v.w);
+        clone.setAttribute('height', v.h);
+        clone.setAttribute('viewBox', `0 0 ${v.w} ${v.h}`);
+        clone.setAttribute('font-family', 'Helvetica, Arial, sans-serif');
+        clone.insertBefore(
+            svgEl('rect', { x: 0, y: 0, width: v.w, height: v.h, fill: '#ffffff' }),
+            clone.firstChild
+        );
+        const markup = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+            new XMLSerializer().serializeToString(clone);
+        return { markup: markup, width: v.w, height: v.h };
+    }
+
     // Public API
     return {
         initialize,
         render,
         updateLegend,
-        resetView
+        resetView,
+        getSvgMarkup
     };
 })();

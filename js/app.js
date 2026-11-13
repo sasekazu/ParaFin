@@ -8,6 +8,8 @@
  * - Validation error display
  * - Geometry regeneration and rendering
  * - Reset and export functionality
+ * - Out-of-range slider indication, inline parameter help
+ * - Export file naming, SVG/PNG image export, drag & drop project loading
  * - Auto-saving the inputs to localStorage and restoring them on start
  */
 
@@ -32,6 +34,32 @@
 
 
     const STORAGE_KEY = 'parafin.project.v1';
+    const FILENAME_KEY = 'parafin.fileName';
+    const MAX_PROJECT_FILE_BYTES = 5 * 1024 * 1024;
+
+    // Short explanations shown by the "?" button next to each parameter
+    const HELP = {
+        fingerWidth: 'Horizontal width of the outer finger cross-section (the outer ellipse).',
+        fingerHeight: 'Vertical (dorsal\u2013palmar) height of the outer finger cross-section.',
+        stratumCorneumThickness: 'Thickness of the outermost skin layer. It follows the local normal, also across fingerprint ridges. The nail thickness is set to stratum corneum + epidermis thickness.',
+        epidermisThickness: 'Thickness of the epidermis, just below the stratum corneum. Dermal papillae height must be smaller than this.',
+        dermisThickness: 'Thickness of the dermis, below the epidermis. Everything inside it is subcutaneous tissue.',
+        boneWidth: 'Width of the elliptical bone cross-section. The bone is centred horizontally and must fit inside the finger.',
+        boneHeight: 'Height of the elliptical bone cross-section.',
+        boneOffsetY: 'Vertical position of the bone centre relative to the finger centre. Positive values move the bone toward the dorsal (nail) side.',
+        nailAngularExtent: 'Angular range of the nail on the dorsal side, symmetric about the dorsal apex (90\u00B0).',
+        fingerprintAngularExtent: 'Requested angular range of the fingerprint ridges, centred on the palmar apex (270\u00B0). The ridge count is rounded up to an odd number of wavelengths, so the actual range can be slightly larger.',
+        fingerprintWavelength: 'Distance between neighbouring fingerprint ridges.',
+        fingerprintRidgeHeight: 'Height of the fingerprint ridges. Set to 0 for a smooth outer boundary.',
+        epidermisDermisAngularExtent: 'Angular range of the dermal papillae at the epidermis\u2013dermis interface, centred on the palmar apex (270\u00B0). Independent of the fingerprint range.',
+        epidermisDermisWavelength: 'Distance between neighbouring dermal papillae.',
+        epidermisDermisHeight: 'Height of the dermal papillae. Set to 0 for a smooth interface; a nonzero value must be smaller than the epidermis thickness.',
+        meshFineSize: 'Target element size in the fine region near the fingerprint curves. Must not exceed the bulk size.',
+        meshBulkSize: 'Target element size away from the fingerprint curves. Without fingerprint ridges the whole mesh uses this size.',
+        meshFineDistance: 'Distance from the fingerprint curves within which the fine size applies.',
+        meshTransitionDistance: 'Distance from the fingerprint curves at which the size reaches the bulk size. Must be greater than the fine-region distance.',
+        meshDistanceSampling: 'Number of sample points per curve used by Gmsh to measure distance. Larger values are more accurate but slower (integer, at least 10).'
+    };
     const SAVE_DELAY_MS = 300;
     let saveTimer = null;
 
@@ -67,6 +95,7 @@
         elements.downloadGeoButton = document.getElementById('downloadGeoButton');
         elements.legend = document.getElementById('legend');
         elements.actionsHint = document.getElementById('actionsHint');
+        elements.exportFileName = document.getElementById('exportFileName');
     }
 
     /**
@@ -126,6 +155,26 @@
     }
 
     /**
+     * Copy an input's value to its slider and flag the slider when the value is
+     * outside the slider's range (the number field still accepts it).
+     * @param {string} param - Parameter name
+     */
+    function syncSlider(param) {
+        const input = elements[param];
+        const slider = elements[param + 'Slider'];
+        const value = parseFloat(input.value);
+        if (!isNaN(value)) slider.value = value;
+        const outOfRange = !isNaN(value) && (value < parseFloat(slider.min) || value > parseFloat(slider.max));
+        slider.classList.toggle('out-of-range', outOfRange);
+        if (outOfRange) {
+            slider.title = 'The value is outside the slider range (' + slider.min + ' to ' + slider.max +
+                '). The number field still accepts it.';
+        } else {
+            slider.removeAttribute('title');
+        }
+    }
+
+    /**
      * Set parameter values in input fields and sliders
      * @param {Object} params - Parameter object
      */
@@ -133,7 +182,7 @@
         PARAM_DEFINITIONS.forEach(param => {
             if (params.hasOwnProperty(param)) {
                 elements[param].value = params[param];
-                elements[param + 'Slider'].value = params[param];
+                syncSlider(param);
             }
         });
         if (params.mesh) {
@@ -194,6 +243,9 @@
             btn.disabled = !enabled;
             if (enabled) btn.removeAttribute('title');
             else btn.title = reason;
+        });
+        document.querySelectorAll('.view-tools [data-action^="save-"]').forEach(btn => {
+            btn.disabled = !enabled;
         });
         elements.actionsHint.textContent = enabled ? '' : reason;
         elements.actionsHint.style.display = enabled ? 'none' : 'block';
@@ -321,6 +373,138 @@
     }
 
     /**
+     * Read a project JSON file and apply it
+     * @param {File} file
+     */
+    function loadProjectFile(file) {
+        if (file.size > MAX_PROJECT_FILE_BYTES) {
+            showSummaryMessage('Failed to load project: the file is too large to be a ParaFin project.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.addEventListener('load', function() {
+            try {
+                setParameters(Exporter.importProjectFromText(reader.result));
+                updateGeometry();
+            } catch (err) {
+                showSummaryMessage('Failed to load project: ' + err.message);
+            }
+        });
+        reader.addEventListener('error', function() {
+            showSummaryMessage('Failed to load project: the file could not be read.');
+        });
+        reader.readAsText(file);
+    }
+
+    /**
+     * Accept a project file dropped anywhere on the page
+     */
+    function setupDropZone() {
+        let depth = 0;
+        const hasFiles = e => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).indexOf('Files') !== -1;
+
+        window.addEventListener('dragenter', function(e) {
+            if (!hasFiles(e)) return;
+            e.preventDefault();
+            depth++;
+            document.body.classList.add('drag-active');
+        });
+        window.addEventListener('dragover', function(e) {
+            if (!hasFiles(e)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+        window.addEventListener('dragleave', function(e) {
+            if (!hasFiles(e)) return;
+            depth = Math.max(0, depth - 1);
+            if (depth === 0) document.body.classList.remove('drag-active');
+        });
+        window.addEventListener('drop', function(e) {
+            if (!hasFiles(e)) return;
+            e.preventDefault();
+            depth = 0;
+            document.body.classList.remove('drag-active');
+            if (e.dataTransfer.files.length > 0) loadProjectFile(e.dataTransfer.files[0]);
+        });
+    }
+
+    /**
+     * User-entered base file name with unsafe characters removed ('' if none)
+     */
+    function exportBaseName() {
+        return (elements.exportFileName.value || '')
+            .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+            .trim()
+            .replace(/^\.+/, '')
+            .replace(/\.(geo|json|svg|png)$/i, '')
+            .trim();
+    }
+
+    /**
+     * Output file name for a given kind. With no base name the original default
+     * names are kept (parafin-model.geo, parafin-project.json, ...).
+     * @param {'geo'|'json'|'svg'|'png'} ext
+     * @param {string} [view] - 'main' or 'detail' (images only)
+     */
+    function exportFileName(ext, view) {
+        const base = exportBaseName();
+        const viewPart = view === 'detail' ? 'fingerprint-detail' : 'cross-section';
+        if (ext === 'geo') return (base || 'parafin-model') + '.geo';
+        if (ext === 'json') return (base || 'parafin-project') + '.json';
+        return (base || 'parafin') + '-' + viewPart + '.' + ext;
+    }
+
+    /**
+     * Save a preview view as SVG or PNG
+     */
+    function saveViewImage(isDetail, format) {
+        const svg = Renderer.getSvgMarkup(isDetail);
+        if (!svg) return;
+        const filename = exportFileName(format, isDetail ? 'detail' : 'main');
+        if (format === 'svg') {
+            Exporter.downloadSVG(svg.markup, filename);
+        } else {
+            Exporter.downloadPNG(svg.markup, svg.width, svg.height, filename).catch(function(err) {
+                console.error(err);
+                window.alert('Could not create the PNG image. Try saving as SVG instead.');
+            });
+        }
+    }
+
+    /**
+     * Add a "?" button with an inline explanation to each parameter
+     */
+    function setupHelp() {
+        Object.keys(HELP).forEach(name => {
+            const label = document.querySelector('label[for="' + name + '"]');
+            if (!label) return;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'help-btn';
+            button.textContent = '?';
+            button.title = 'What is this?';
+            button.setAttribute('aria-label', 'About ' + labelFor(name));
+            button.setAttribute('aria-expanded', 'false');
+            button.setAttribute('aria-controls', 'help-' + name);
+
+            const text = document.createElement('div');
+            text.className = 'help-text';
+            text.id = 'help-' + name;
+            text.hidden = true;
+            text.textContent = HELP[name];
+
+            button.addEventListener('click', function() {
+                text.hidden = !text.hidden;
+                button.setAttribute('aria-expanded', text.hidden ? 'false' : 'true');
+            });
+
+            label.appendChild(button);
+            label.insertAdjacentElement('afterend', text);
+        });
+    }
+
+    /**
      * Setup event listeners for input synchronization
      */
     function setupEventListeners() {
@@ -346,16 +530,14 @@
 
             // Input -> Slider sync
             input.addEventListener('input', function() {
-                const value = parseFloat(this.value);
-                if (!isNaN(value)) {
-                    slider.value = value;
-                }
+                syncSlider(param);
                 updateGeometry();
             });
 
             // Slider -> Input sync
             slider.addEventListener('input', function() {
                 input.value = this.value;
+                syncSlider(param);
                 updateGeometry();
             });
         });
@@ -373,22 +555,12 @@
             fileInput.type = 'file';
             fileInput.accept = '.json';
             fileInput.addEventListener('change', function() {
-                const file = this.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.addEventListener('load', function() {
-                    try {
-                        const importedParams = Exporter.importProjectFromText(reader.result);
-                        setParameters(importedParams);
-                        updateGeometry();
-                    } catch (err) {
-                        showSummaryMessage('Failed to load project: ' + err.message);
-                    }
-                });
-                reader.readAsText(file);
+                if (this.files[0]) loadProjectFile(this.files[0]);
             });
             fileInput.click();
         });
+
+        setupDropZone();
 
         // Download JSON button
         elements.downloadButton.addEventListener('click', function() {
@@ -398,7 +570,7 @@
             const validation = Geometry.validateParameters(params);
 
             if (validation.valid) {
-                Exporter.downloadJSON(params);
+                Exporter.downloadJSON(params, exportFileName('json'));
             }
         });
 
@@ -411,9 +583,26 @@
 
             if (validation.valid) {
                 const geometry = Geometry.generateGeometry(params);
-                Exporter.downloadGEO(params, geometry);
+                Exporter.downloadGEO(params, geometry, exportFileName('geo'));
             }
         });
+
+        // Image export buttons in the preview views
+        document.querySelectorAll('.view-tools [data-action="save-svg"], .view-tools [data-action="save-png"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                if (this.disabled) return;
+                saveViewImage(this.getAttribute('data-view') === 'detail',
+                    this.getAttribute('data-action') === 'save-png' ? 'png' : 'svg');
+            });
+        });
+
+        // Export file name (remembered between visits)
+        try { elements.exportFileName.value = localStorage.getItem(FILENAME_KEY) || ''; } catch (e) { /* ignore */ }
+        elements.exportFileName.addEventListener('input', function() {
+            try { localStorage.setItem(FILENAME_KEY, this.value); } catch (e) { /* ignore */ }
+        });
+
+        setupHelp();
 
         // Mesh settings inputs
         MESH_PARAM_NAMES.forEach(name => {

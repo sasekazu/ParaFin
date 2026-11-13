@@ -606,10 +606,75 @@ const Exporter = (function() {
     }
 
     // ---------------------------------------------------------------------------
+    // Image export (preview views)
+    // ---------------------------------------------------------------------------
+
+    function saveBlob(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(url); }, 0);
+    }
+
+    /**
+     * Download SVG markup as a file
+     * @param {string} markup - Standalone SVG document text
+     * @param {string} filename - Output filename
+     */
+    function downloadSVG(markup, filename) {
+        saveBlob(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }), filename);
+    }
+
+    /**
+     * Rasterize SVG markup and download it as a PNG file
+     * @param {string} markup - Standalone SVG document text
+     * @param {number} width - SVG width in px
+     * @param {number} height - SVG height in px
+     * @param {string} filename - Output filename
+     * @param {number} [scale=2] - Pixel ratio of the PNG relative to the SVG size
+     * @returns {Promise<void>}
+     */
+    function downloadPNG(markup, width, height, filename, scale = 2) {
+        return new Promise(function(resolve, reject) {
+            const svgUrl = URL.createObjectURL(new Blob([markup], { type: 'image/svg+xml;charset=utf-8' }));
+            const img = new Image();
+            img.onload = function() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(width * scale);
+                    canvas.height = Math.round(height * scale);
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    URL.revokeObjectURL(svgUrl);
+                    canvas.toBlob(function(blob) {
+                        if (!blob) { reject(new Error('PNG encoding failed')); return; }
+                        saveBlob(blob, filename);
+                        resolve();
+                    }, 'image/png');
+                } catch (e) {
+                    URL.revokeObjectURL(svgUrl);
+                    reject(e);
+                }
+            };
+            img.onerror = function() {
+                URL.revokeObjectURL(svgUrl);
+                reject(new Error('Could not rasterize the SVG'));
+            };
+            img.src = svgUrl;
+        });
+    }
+
+    // ---------------------------------------------------------------------------
     // Public API
     // ---------------------------------------------------------------------------
 
     return {
+        downloadSVG,
+        downloadPNG,
         generateJSON:          _ProjectIO.generateJSON,
         downloadJSON:          _ProjectIO.downloadJSON,
         generateGEO,

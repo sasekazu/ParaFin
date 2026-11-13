@@ -237,6 +237,11 @@
                 <p class="actions-hint" id="actionsHint" role="status" style="display: none;"></p>
                 <button id="resetButton" class="btn btn-secondary">Reset to Defaults</button>
                 <button id="loadProjectButton" class="btn btn-secondary">Load Project</button>
+                <div class="filename-group">
+                    <label for="exportFileName">File name <span class="parameter-unit">(optional)</span></label>
+                    <input type="text" id="exportFileName" placeholder="parafin-model" maxlength="80" autocomplete="off" spellcheck="false" aria-describedby="fileNameHelp">
+                    <small id="fileNameHelp">Base name for downloaded .geo, .json and image files.</small>
+                </div>
                 <button id="downloadButton" class="btn btn-primary">Download JSON</button>
                 <button id="downloadGeoButton" class="btn btn-primary">Download GEO</button>
             </div>
@@ -257,6 +262,8 @@
                             <button type="button" data-action="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
                             <button type="button" data-action="zoom-out" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
                             <button type="button" data-action="reset" title="Reset view (double-click or 0)" aria-label="Reset view">Reset</button>
+                            <button type="button" data-action="save-svg" data-view="main" title="Save this view as SVG" aria-label="Save this view as SVG">SVG</button>
+                            <button type="button" data-action="save-png" data-view="main" title="Save this view as PNG" aria-label="Save this view as PNG">PNG</button>
                         </div>
                     </div>
                 </div>
@@ -268,6 +275,8 @@
                             <button type="button" data-action="zoom-in" title="Zoom in (+)" aria-label="Zoom in">+</button>
                             <button type="button" data-action="zoom-out" title="Zoom out (-)" aria-label="Zoom out">&minus;</button>
                             <button type="button" data-action="reset" title="Reset view (double-click or 0)" aria-label="Reset view">Reset</button>
+                            <button type="button" data-action="save-svg" data-view="detail" title="Save this view as SVG" aria-label="Save this view as SVG">SVG</button>
+                            <button type="button" data-action="save-png" data-view="detail" title="Save this view as PNG" aria-label="Save this view as PNG">PNG</button>
                         </div>
                     </div>
                 </div>

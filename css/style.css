@@ -512,3 +512,110 @@ header .subtitle {
 svg text {
     user-select: none;
 }
+
+/* Slider whose value is outside its range (number field accepts it) */
+.param-group input[type="range"].out-of-range {
+    opacity: 0.55;
+}
+
+.param-group input[type="range"].out-of-range::-webkit-slider-thumb {
+    background: #e67e22;
+}
+
+.param-group input[type="range"].out-of-range::-moz-range-thumb {
+    background: #e67e22;
+}
+
+/* Inline parameter help */
+.help-btn {
+    width: 18px;
+    height: 18px;
+    margin-left: 0.4rem;
+    padding: 0;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1;
+    color: #3498db;
+    background: #fff;
+    border: 1px solid #3498db;
+    border-radius: 50%;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.help-btn:hover,
+.help-btn[aria-expanded="true"] {
+    color: #fff;
+    background: #3498db;
+}
+
+.help-btn:focus-visible {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
+}
+
+.help-text {
+    margin-bottom: 0.4rem;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: #444;
+    background-color: #f4f8fb;
+    border-left: 3px solid #3498db;
+}
+
+.help-text[hidden] {
+    display: none;
+}
+
+/* Export file name */
+.filename-group label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: #555;
+    margin-bottom: 0.25rem;
+}
+
+.filename-group input[type="text"] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 0.875rem;
+}
+
+.filename-group input[type="text"]:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.filename-group small {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.view-tools button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Drag & drop overlay */
+body.drag-active::after {
+    content: 'Drop a ParaFin project (.json) to load it';
+    position: fixed;
+    inset: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #2c3e50;
+    background-color: rgba(52, 152, 219, 0.15);
+    border: 3px dashed #3498db;
+    border-radius: 8px;
+    pointer-events: none;
+    z-index: 100;
+}
