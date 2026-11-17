@@ -266,6 +266,8 @@ The current format is:
 | 5 | Bone |
 | 6 | Nail |
 
+When the stratum corneum thickness is `0`, the finger-outer and stratum-corneum-inner boundaries coincide. In that case the exported GEO omits the stratum corneum surface (Physical Surface 1 is not defined), and the epidermis and nail are bounded directly by the outer finger boundary.
+
 ### Physical curves
 
 | ID | Name |

@@ -12,6 +12,9 @@ const Exporter = (function() {
 
     const APP_VERSION = '0.1.0';
 
+    // Stratum corneum thickness at or below this is treated as zero (no SC surface exported)
+    const STRATUM_CORNEUM_EPS = 1e-10;
+
     /**
      * Generate Gmsh mesh-size control GEO lines.
      * Returns an array of GEO lines (empty when mesh control is disabled).
@@ -408,9 +411,27 @@ const Exporter = (function() {
         const fo = createSegmentedBoundary(
             fingerOuterBoundary, fpMeta, false, 'Finger outer boundary');
 
-        const scInnerBoundary = geometry.boundaries.find(b => b.id === 'stratum-corneum-inner');
-        const sc = createSegmentedBoundary(
-            scInnerBoundary, fpMeta, true, 'Stratum corneum inner boundary');
+        // Zero-thickness stratum corneum: the finger-outer and stratum-corneum-inner boundaries
+        // coincide, so exporting both would produce zero-length connecting lines and a
+        // degenerate (zero-area) surface that OpenCASCADE rejects. In that case the stratum
+        // corneum boundary/surface is omitted entirely and the epidermis and nail are bounded
+        // directly by the finger-outer boundary.
+        const hasStratumCorneum = params.stratumCorneumThickness > STRATUM_CORNEUM_EPS;
+
+        let sc = null;
+        if (hasStratumCorneum) {
+            const scInnerBoundary = geometry.boundaries.find(b => b.id === 'stratum-corneum-inner');
+            sc = createSegmentedBoundary(
+                scInnerBoundary, fpMeta, true, 'Stratum corneum inner boundary');
+        } else {
+            geo.push('// Stratum corneum thickness is 0: stratum corneum boundary and surface are omitted.');
+            geo.push('// Epidermis and nail are bounded directly by the finger outer boundary.');
+            geo.push('');
+        }
+
+        // Outer boundary of the epidermis: sc-inner normally, finger-outer when t_sc = 0
+        const epOuter = hasStratumCorneum ? sc : fo;
+        const epOuterLabel = hasStratumCorneum ? 'sc-inner' : 'finger-outer';
 
         // Epidermis-inner boundary uses its own independent metadata (epidermisDermisMetadata),
         // since dermal papillae angular extent/wavelength/height are independent of fingerprint
@@ -434,67 +455,79 @@ const Exporter = (function() {
         );
 
         // Connecting lines at nail edges (finger-outer → sc-inner → epidermis-inner)
+        // With a stratum corneum: finger-outer → sc-inner (Upper) and sc-inner → epidermis-inner (Lower).
+        // Without one (t_sc = 0): a single finger-outer → epidermis-inner line per side (Lower only;
+        // Upper is null).
         geo.push('// Connecting lines at nail edges');
-        const cConnectRightUpper = curveId++;
+        const cConnectRightUpper = hasStratumCorneum ? curveId++ : null;
         const cConnectRightLower = curveId++;
-        const cConnectLeftUpper  = curveId++;
+        const cConnectLeftUpper  = hasStratumCorneum ? curveId++ : null;
         const cConnectLeftLower  = curveId++;
-        geo.push(`Line(${cConnectRightUpper}) = {${fo.pNailStart}, ${sc.pNailStart}};  // nail-start: finger-outer → sc-inner`);
-        geo.push(`Line(${cConnectRightLower}) = {${sc.pNailStart}, ${ep.pNailStart}};  // nail-start: sc-inner → epidermis-inner`);
-        geo.push(`Line(${cConnectLeftUpper})  = {${fo.pNailEnd},   ${sc.pNailEnd}};    // nail-end: finger-outer → sc-inner`);
-        geo.push(`Line(${cConnectLeftLower})  = {${sc.pNailEnd},   ${ep.pNailEnd}};    // nail-end: sc-inner → epidermis-inner`);
+        if (hasStratumCorneum) {
+            geo.push(`Line(${cConnectRightUpper}) = {${fo.pNailStart}, ${sc.pNailStart}};  // nail-start: finger-outer → sc-inner`);
+            geo.push(`Line(${cConnectRightLower}) = {${sc.pNailStart}, ${ep.pNailStart}};  // nail-start: sc-inner → epidermis-inner`);
+            geo.push(`Line(${cConnectLeftUpper})  = {${fo.pNailEnd},   ${sc.pNailEnd}};    // nail-end: finger-outer → sc-inner`);
+            geo.push(`Line(${cConnectLeftLower})  = {${sc.pNailEnd},   ${ep.pNailEnd}};    // nail-end: sc-inner → epidermis-inner`);
+        } else {
+            geo.push(`Line(${cConnectRightLower}) = {${fo.pNailStart}, ${ep.pNailStart}};  // nail-start: finger-outer → epidermis-inner`);
+            geo.push(`Line(${cConnectLeftLower})  = {${fo.pNailEnd},   ${ep.pNailEnd}};    // nail-end: finger-outer → epidermis-inner`);
+        }
         geo.push('');
 
         geo.push('// Curve Loops and Plane Surfaces');
         geo.push('');
 
-        // 1. Stratum Corneum: annular region between finger-outer and sc-inner, excluding nail
-        // Loop traversal (CCW starting at fo.p0deg = 0°):
-        //   Outer FO: nailStartCurve → cConnectRightUpper ↓
-        //   Inner SC: -nailStartCurve → -palmarRecedeCurve → -palmarCoreCurves(reversed)
-        //             → -palmarApproachCurve → -nailEndCurve → -cConnectLeftUpper ↑
-        //   Outer FO: nailEndCurve → palmarApproachCurve → palmarCoreCurves → palmarRecedeCurve
-        const scLoopId = curveLoopId++;
-        geo.push('// Stratum Corneum (annular, excluding nail)');
-        geo.push(`Curve Loop(${scLoopId}) = {`);
-        geo.push(`  ${fo.nailStartCurve},        // 0° → nail-start (finger-outer)`);
-        geo.push(`  ${cConnectRightUpper},         // nail-start: finger-outer → sc-inner`);
-        geo.push(`  -${sc.nailStartCurve},         // nail-start → 0° (sc-inner, reversed)`);
-        geo.push(`  -${sc.palmarRecedeCurve},      // 0° → palmar-end (sc-inner, reversed)`);
-        [...sc.palmarCoreCurves].reverse().forEach(cid => geo.push(`  -${cid},`));
-        geo.push(`  -${sc.palmarApproachCurve},    // palmar-start → 180° (sc-inner, reversed)`);
-        geo.push(`  -${sc.nailEndCurve},           // 180° → nail-end (sc-inner, reversed)`);
-        geo.push(`  -${cConnectLeftUpper},          // nail-end: sc-inner → finger-outer (reversed)`);
-        geo.push(`  ${fo.nailEndCurve},            // nail-end → 180° (finger-outer)`);
-        geo.push(`  ${fo.palmarApproachCurve},     // 180° → palmar-start (finger-outer)`);
-        fo.palmarCoreCurves.forEach(cid => geo.push(`  ${cid},`));
-        geo.push(`  ${fo.palmarRecedeCurve}        // palmar-end → 0° (finger-outer, closes loop)`);
-        geo.push('};');
-        const scSurfaceId = surfaceId++;
-        geo.push(`Plane Surface(${scSurfaceId}) = {${scLoopId}};`);
-        geo.push('');
+        let scSurfaceId = null;
+        if (hasStratumCorneum) {
+            // 1. Stratum Corneum: annular region between finger-outer and sc-inner, excluding nail
+            // Loop traversal (CCW starting at fo.p0deg = 0°):
+            //   Outer FO: nailStartCurve → cConnectRightUpper ↓
+            //   Inner SC: -nailStartCurve → -palmarRecedeCurve → -palmarCoreCurves(reversed)
+            //             → -palmarApproachCurve → -nailEndCurve → -cConnectLeftUpper ↑
+            //   Outer FO: nailEndCurve → palmarApproachCurve → palmarCoreCurves → palmarRecedeCurve
+            const scLoopId = curveLoopId++;
+            geo.push('// Stratum Corneum (annular, excluding nail)');
+            geo.push(`Curve Loop(${scLoopId}) = {`);
+            geo.push(`  ${fo.nailStartCurve},        // 0° → nail-start (finger-outer)`);
+            geo.push(`  ${cConnectRightUpper},         // nail-start: finger-outer → sc-inner`);
+            geo.push(`  -${sc.nailStartCurve},         // nail-start → 0° (sc-inner, reversed)`);
+            geo.push(`  -${sc.palmarRecedeCurve},      // 0° → palmar-end (sc-inner, reversed)`);
+            [...sc.palmarCoreCurves].reverse().forEach(cid => geo.push(`  -${cid},`));
+            geo.push(`  -${sc.palmarApproachCurve},    // palmar-start → 180° (sc-inner, reversed)`);
+            geo.push(`  -${sc.nailEndCurve},           // 180° → nail-end (sc-inner, reversed)`);
+            geo.push(`  -${cConnectLeftUpper},          // nail-end: sc-inner → finger-outer (reversed)`);
+            geo.push(`  ${fo.nailEndCurve},            // nail-end → 180° (finger-outer)`);
+            geo.push(`  ${fo.palmarApproachCurve},     // 180° → palmar-start (finger-outer)`);
+            fo.palmarCoreCurves.forEach(cid => geo.push(`  ${cid},`));
+            geo.push(`  ${fo.palmarRecedeCurve}        // palmar-end → 0° (finger-outer, closes loop)`);
+            geo.push('};');
+            scSurfaceId = surfaceId++;
+            geo.push(`Plane Surface(${scSurfaceId}) = {${scLoopId}};`);
+            geo.push('');
+        }
 
-        // 2. Epidermis: annular region between sc-inner and epidermis-inner, excluding nail
-        // Loop traversal (CCW starting at sc.p0deg = 0°):
-        //   Outer SC: nailStartCurve → cConnectRightLower ↓
+        // 2. Epidermis: annular region between outer boundary and epidermis-inner, excluding nail
+        // epOuter is sc-inner, or finger-outer when t_sc = 0.
+        // Loop traversal (CCW starting at epOuter.p0deg = 0°):
+        //   Outer: nailStartCurve → cConnectRightLower ↓
         //   Inner EP: -nailStartCurve → -palmarRecedeCurve → -palmarCoreCurves(reversed)
         //             → -palmarApproachCurve → -nailEndCurve → -cConnectLeftLower ↑
-        //   Outer SC: nailEndCurve → palmarApproachCurve → palmarCoreCurves → palmarRecedeCurve
+        //   Outer: nailEndCurve → palmarApproachCurve → palmarCoreCurves → palmarRecedeCurve
         const epidermisLoopId = curveLoopId++;
         geo.push('// Epidermis (annular, excluding nail)');
         geo.push(`Curve Loop(${epidermisLoopId}) = {`);
-        geo.push(`  ${sc.nailStartCurve},          // 0° → nail-start (sc-inner)`);
-        geo.push(`  ${cConnectRightLower},           // nail-start: sc-inner → epidermis-inner`);
+        geo.push(`  ${epOuter.nailStartCurve},          // 0° → nail-start (${epOuterLabel})`);
+        geo.push(`  ${cConnectRightLower},           // nail-start: ${epOuterLabel} → epidermis-inner`);
         geo.push(`  -${ep.nailStartCurve},           // nail-start → 0° (epidermis-inner, reversed)`);
         geo.push(`  -${ep.palmarRecedeCurve},        // 0° → palmar-end (epidermis-inner, reversed)`);
         [...ep.palmarCoreCurves].reverse().forEach(cid => geo.push(`  -${cid},`));
         geo.push(`  -${ep.palmarApproachCurve},      // palmar-start → 180° (epidermis-inner, reversed)`);
         geo.push(`  -${ep.nailEndCurve},             // 180° → nail-end (epidermis-inner, reversed)`);
-        geo.push(`  -${cConnectLeftLower},            // nail-end: epidermis-inner → sc-inner (reversed)`);
-        geo.push(`  ${sc.nailEndCurve},             // nail-end → 180° (sc-inner)`);
-        geo.push(`  ${sc.palmarApproachCurve},      // 180° → palmar-start (sc-inner)`);
-        sc.palmarCoreCurves.forEach(cid => geo.push(`  ${cid},`));
-        geo.push(`  ${sc.palmarRecedeCurve}         // palmar-end → 0° (sc-inner, closes loop)`);
+        geo.push(`  -${cConnectLeftLower},            // nail-end: epidermis-inner → ${epOuterLabel} (reversed)`);
+        geo.push(`  ${epOuter.nailEndCurve},             // nail-end → 180° (${epOuterLabel})`);
+        geo.push(`  ${epOuter.palmarApproachCurve},      // 180° → palmar-start (${epOuterLabel})`);
+        epOuter.palmarCoreCurves.forEach(cid => geo.push(`  ${cid},`));
+        geo.push(`  ${epOuter.palmarRecedeCurve}         // palmar-end → 0° (${epOuterLabel}, closes loop)`);
         geo.push('};');
         const epidermisSurfaceId = surfaceId++;
         geo.push(`Plane Surface(${epidermisSurfaceId}) = {${epidermisLoopId}};`);
@@ -537,12 +570,18 @@ const Exporter = (function() {
         geo.push(`Curve Loop(${nailLoopId}) = {`);
         geo.push(`  ${fo.nailCurve1},              // nail-start → 90° (finger-outer)`);
         geo.push(`  ${fo.nailCurve2},              // 90° → nail-end (finger-outer)`);
-        geo.push(`  ${cConnectLeftUpper},           // nail-end: finger-outer → sc-inner`);
-        geo.push(`  ${cConnectLeftLower},           // nail-end: sc-inner → epidermis-inner`);
+        if (hasStratumCorneum) {
+            geo.push(`  ${cConnectLeftUpper},           // nail-end: finger-outer → sc-inner`);
+        }
+        geo.push(`  ${cConnectLeftLower},           // nail-end: ${hasStratumCorneum ? 'sc-inner' : 'finger-outer'} → epidermis-inner`);
         geo.push(`  -${ep.nailCurve2},              // nail-end → 90° (epidermis-inner, reversed)`);
         geo.push(`  -${ep.nailCurve1},              // 90° → nail-start (epidermis-inner, reversed)`);
-        geo.push(`  -${cConnectRightLower},          // nail-start: epidermis-inner → sc-inner (reversed)`);
-        geo.push(`  -${cConnectRightUpper}           // nail-start: sc-inner → finger-outer (reversed, closes loop)`);
+        if (hasStratumCorneum) {
+            geo.push(`  -${cConnectRightLower},          // nail-start: epidermis-inner → sc-inner (reversed)`);
+            geo.push(`  -${cConnectRightUpper}           // nail-start: sc-inner → finger-outer (reversed, closes loop)`);
+        } else {
+            geo.push(`  -${cConnectRightLower}           // nail-start: epidermis-inner → finger-outer (reversed, closes loop)`);
+        }
         geo.push('};');
         const nailSurfaceId = surfaceId++;
         geo.push(`Plane Surface(${nailSurfaceId}) = {${nailLoopId}};`);
@@ -550,7 +589,11 @@ const Exporter = (function() {
 
         // Physical surfaces (6 tissue layers)
         geo.push('// Physical Surfaces (Tissues)');
-        geo.push(`Physical Surface("Stratum Corneum", 1) = {${scSurfaceId}};`);
+        if (hasStratumCorneum) {
+            geo.push(`Physical Surface("Stratum Corneum", 1) = {${scSurfaceId}};`);
+        } else {
+            geo.push('// (no Stratum Corneum surface: thickness is 0)');
+        }
         geo.push(`Physical Surface("Epidermis", 2) = {${epidermisSurfaceId}};`);
         geo.push(`Physical Surface("Dermis", 3) = {${dermisSurfaceId}};`);
         geo.push(`Physical Surface("Subcutaneous", 4) = {${subcutaneousSurfaceId}};`);
@@ -568,7 +611,7 @@ const Exporter = (function() {
         // Mesh-size control: refine near BSpline palmar curves when fingerprint ridges and/or
         // dermal papillae are active; empty entries contribute nothing when the corresponding
         // boundary has an Ellipse palmarCoreCurve (ridgeHeight=0 / epidermisDermisHeight=0).
-        const fineCurveIds = [...fo.refineCurves, ...sc.refineCurves, ...ep.refineCurves];
+        const fineCurveIds = [...fo.refineCurves, ...(sc ? sc.refineCurves : []), ...ep.refineCurves];
 
         const meshLines = generateMeshControlGEO(params.mesh, fineCurveIds);
         meshLines.forEach(line => geo.push(line));
